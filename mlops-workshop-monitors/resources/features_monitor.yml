@@ -1,0 +1,20 @@
+# Features Monitor — time_series profile on Feature View output
+#
+# Catches: upstream feature distribution drift
+# Monitors the primary Feature View table (avg_daily_sessions_30d)
+# Output tables (auto-created):
+#   churn_features_avg_daily_sessions_30d_profile_metrics
+#   churn_features_avg_daily_sessions_30d_drift_metrics
+resources:
+  quality_monitors:
+    features_monitor:
+      table_name: ${var.catalog}.${var.user_schema}.churn_features_avg_daily_sessions_30d
+      output_schema_name: ${var.catalog}.${var.user_schema}
+      assets_dir: /Workspace/Users/${workspace.current_user.userName}/monitors/features
+      time_series:
+        granularities:
+          - "1 day"
+        timestamp_col: window_end
+      schedule:
+        quartz_cron_expression: "0 0 9 * * ?"
+        timezone_id: "UTC"

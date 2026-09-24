@@ -1,0 +1,59 @@
+# MLOps Dashboard — serialized inline (not file_path)
+#
+# Design decision (L200-03 §4.1): serialized_dashboard deploys without
+# query validation. A file_path dashboard validates queries at deploy
+# time, which fails because monitoring output tables don't exist yet.
+#
+# Pages: Model Accuracy | Prediction & Feature Drift | Data Quality | Serving Health
+# All queries use ${var.catalog}.${var.user_schema} — resolved at deploy time.
+#
+# NOTE: This is a skeleton dashboard with datasets and page definitions.
+# Full widget layout will be authored in the UI and exported here.
+resources:
+  dashboards:
+    mlops_dashboard:
+      display_name: "[${bundle.target}] MLOps Workshop Dashboard"
+      warehouse_id: ${var.warehouse_id}
+      serialized_dashboard: |
+        {
+          "pages": [
+            {
+              "name": "model_accuracy",
+              "displayName": "Model Accuracy Over Time"
+            },
+            {
+              "name": "drift",
+              "displayName": "Prediction & Feature Drift"
+            },
+            {
+              "name": "data_quality",
+              "displayName": "Data Quality & Volume"
+            },
+            {
+              "name": "serving_health",
+              "displayName": "Serving Endpoint Health"
+            }
+          ],
+          "datasets": [
+            {
+              "name": "accuracy_over_time",
+              "displayName": "Model Accuracy Over Time",
+              "query": "SELECT window.start AS period_start, model_id_col AS model_version, MAX(CASE WHEN column_name = ':table' THEN accuracy END) AS accuracy, MAX(CASE WHEN column_name = ':table' THEN f1_score END) AS f1_score FROM ${var.catalog}.${var.user_schema}.churn_predictions_profile_metrics WHERE log_type = 'INPUT' AND slice_key IS NULL GROUP BY window.start, model_id_col ORDER BY period_start"
+            },
+            {
+              "name": "feature_drift_heatmap",
+              "displayName": "Feature Drift Heatmap",
+              "query": "SELECT window.start AS period_start, column_name AS feature, ks_test.pvalue AS ks_pvalue, wasserstein_distance, CASE WHEN ks_test.pvalue < 0.01 THEN 'HIGH' WHEN ks_test.pvalue < 0.05 THEN 'MEDIUM' ELSE 'LOW' END AS drift_severity FROM ${var.catalog}.${var.user_schema}.churn_features_avg_daily_sessions_30d_drift_metrics WHERE drift_type = 'CONSECUTIVE' AND column_name != ':table' ORDER BY period_start, feature"
+            },
+            {
+              "name": "serving_health",
+              "displayName": "Serving Endpoint Health",
+              "query": "SELECT window.start AS period_start, count AS request_count, avg AS avg_value FROM ${var.catalog}.${var.user_schema}.churn_serving_payload_profile_metrics WHERE column_name = 'status_code' AND log_type = 'INPUT' ORDER BY period_start"
+            },
+            {
+              "name": "prediction_drift",
+              "displayName": "Prediction Drift (PSI)",
+              "query": "SELECT window.start AS period_start, population_stability_index AS psi, CASE WHEN population_stability_index > 0.25 THEN 'HIGH' WHEN population_stability_index > 0.10 THEN 'MEDIUM' ELSE 'LOW' END AS drift_severity FROM ${var.catalog}.${var.user_schema}.churn_predictions_drift_metrics WHERE column_name = ':table' AND drift_type = 'CONSECUTIVE' ORDER BY period_start"
+            }
+          ]
+        }

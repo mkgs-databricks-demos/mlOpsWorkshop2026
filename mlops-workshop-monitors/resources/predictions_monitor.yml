@@ -1,0 +1,23 @@
+# Predictions Monitor — inference_log profile on churn_predictions
+#
+# Catches: prediction drift, model accuracy degradation, scoring input quality
+# Output tables (auto-created):
+#   churn_predictions_profile_metrics — accuracy, F1, precision, recall, per-column stats
+#   churn_predictions_drift_metrics   — KS test, PSI, Wasserstein distance
+resources:
+  quality_monitors:
+    predictions_monitor:
+      table_name: ${var.catalog}.${var.user_schema}.churn_predictions
+      output_schema_name: ${var.catalog}.${var.user_schema}
+      assets_dir: /Workspace/Users/${workspace.current_user.userName}/monitors/predictions
+      inference_log:
+        granularities:
+          - "1 day"
+        timestamp_col: prediction_timestamp
+        model_id_col: model_version
+        prediction_col: churn_probability
+        label_col: actual_churned
+        problem_type: PROBLEM_TYPE_CLASSIFICATION
+      schedule:
+        quartz_cron_expression: "0 0 10 * * ?"
+        timezone_id: "UTC"

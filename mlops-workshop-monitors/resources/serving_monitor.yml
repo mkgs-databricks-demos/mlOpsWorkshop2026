@@ -1,0 +1,21 @@
+# Serving Monitor — time_series profile on AI Gateway payload table
+#
+# Catches: online request anomalies, volume spikes, latency issues
+# Why time_series (not inference_log): the serving payload table has a
+# Databricks-defined schema with JSON request/response columns, not the
+# clean prediction_col/label_col structure that inference_log expects.
+#
+# Table auto-created by AI Gateway after first request to the endpoint.
+resources:
+  quality_monitors:
+    serving_monitor:
+      table_name: ${var.catalog}.${var.user_schema}.churn_serving_payload
+      output_schema_name: ${var.catalog}.${var.user_schema}
+      assets_dir: /Workspace/Users/${workspace.current_user.userName}/monitors/serving
+      time_series:
+        granularities:
+          - "1 hour"
+        timestamp_col: timestamp_ms
+      schedule:
+        quartz_cron_expression: "0 */30 * * * ?"
+        timezone_id: "UTC"

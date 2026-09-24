@@ -1,0 +1,48 @@
+# Retraining Trigger Job — drift-driven feedback loop
+#
+# Task graph:
+#   check_drift_metrics → should_retrain (condition gate) → trigger_retraining (run_job_task)
+#
+# Thresholds: PSI > 0.25 | Accuracy < 0.70 | Consecutive drift days ≥ 5
+# Anti-patterns: 24h cooldown, no retrain while previous run active
+#
+# See docs/diagrams/04_retraining_loop.md
+resources:
+  jobs:
+    churn_retraining_trigger:
+      name: "[${bundle.target}] mlops-workshop-retraining-trigger"
+      tags:
+        bundle: mlops-workshop-monitors
+        workshop: mlops-workshop-2026
+      schedule:
+        quartz_cron_expression: "0 0 15 * * ?"
+        timezone_id: "UTC"
+
+      tasks:
+        # 1. Query monitoring output tables for drift and accuracy
+        - task_key: check_drift_metrics
+          notebook_task:
+            notebook_path: ./src/check_metrics.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.user_schema}
+              max_psi: "0.25"
+              min_accuracy: "0.70"
+              max_consecutive_drift_days: "5"
+
+        # 2. Condition gate: should we retrain?
+        - task_key: should_retrain
+          depends_on:
+            - task_key: check_drift_metrics
+          condition_task:
+            left: "{{tasks.check_drift_metrics.values.retrain_needed}}"
+            op: EQUAL_TO
+            right: "true"
+
+        # 3. Trigger the -infra training job (cross-bundle via variable)
+        - task_key: trigger_retraining
+          depends_on:
+            - task_key: should_retrain
+              outcome: "true"
+          run_job_task:
+            job_id: ${var.training_job_id}
