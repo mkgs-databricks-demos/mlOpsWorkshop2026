@@ -6,11 +6,11 @@ bundle:
 variables:
   catalog:
     description: "Must match -infra catalog"
-    default: "mlops_workshop"
+    default: "hls_fde_dev"
   user_schema:
-    description: "Must match -infra schema"
+    description: "Actual deployed schema name from -infra (includes dev-mode prefix in dev)"
   registered_model_name:
-    description: "Full 3-level name of registered model from -infra"
+    description: "Full 3-level UC name of registered model from -infra"
 
 include:
   - resources/*.yml
@@ -23,9 +23,10 @@ targets:
     workspace:
       host: https://fevm-hls-fde.cloud.databricks.com
     variables:
-      catalog: mlops_workshop
-      user_schema: "user_${bundle.user_name}"
-      registered_model_name: "mlops_workshop.user_${bundle.user_name}.churn_model"
+      catalog: hls_fde_dev
+      # Dev-mode prefix from -infra: dev_<user>_<base_schema>
+      user_schema: "dev_${workspace.current_user.short_name}_mlops_workshop"
+      registered_model_name: "hls_fde_dev.dev_${workspace.current_user.short_name}_mlops_workshop.dev_${workspace.current_user.short_name}_churn_model"
 
   prod:
     mode: production

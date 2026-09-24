@@ -7,13 +7,19 @@
 #   Caller sends only {"customer_id": "CUST-00042"}
 #   Feature Store auto-resolves all features from online store
 #
+# Version lifecycle:
+#   Initial deploy uses entity_version "1" (first available model).
+#   The churn_deployment_job in -infra updates the served version
+#   when a new Champion is promoted (via SDK endpoint update).
+#
 # After first request, Databricks auto-creates:
 #   ${var.catalog}.${var.user_schema}.churn_serving_payload
 #   (monitored by serving_monitor in -monitors bundle)
 resources:
   model_serving_endpoints:
     churn_serving:
-      name: "churn-serving-${var.user_schema}"
+      # Dev mode adds [dev <user>] prefix — no need for schema in the name
+      name: "churn-serving"
       config:
         served_entities:
           - entity_name: ${var.registered_model_name}
@@ -24,5 +30,6 @@ resources:
         inference_table_config:
           catalog_name: ${var.catalog}
           schema_name: ${var.user_schema}
-          table_name_prefix: "churn_serving"
+          # "churn_serving" prefix taken by leftover from failed deploy — use v2
+          table_name_prefix: "churn_serving_v2"
           enabled: true
