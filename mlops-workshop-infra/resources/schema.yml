@@ -1,0 +1,15 @@
+# UC Schema + Volume — foundational resources for the workshop
+resources:
+  schemas:
+    workshop_schema:
+      catalog_name: ${var.catalog}
+      name: ${var.user_schema}
+      comment: "MLOps workshop schema for ${bundle.user_name}"
+
+  volumes:
+    landing_volume:
+      catalog_name: ${resources.schemas.workshop_schema.catalog_name}
+      schema_name: ${resources.schemas.workshop_schema.name}
+      name: landing
+      volume_type: MANAGED
+      comment: "NDJSON landing zone for Auto Loader ingestion path"

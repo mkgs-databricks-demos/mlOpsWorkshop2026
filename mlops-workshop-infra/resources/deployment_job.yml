@@ -1,0 +1,43 @@
+# MLflow 3 Deployment Job — auto-triggers on MODEL_VERSION_READY
+#
+# Task graph:
+#   evaluate → approve (condition gate) → promote_champion
+resources:
+  jobs:
+    churn_deployment_job:
+      name: "[${bundle.target}] mlops-workshop-churn-deployment"
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026
+      trigger:
+        model_update:
+          model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+          events:
+            - MODEL_VERSION_READY
+
+      tasks:
+        # 1. Evaluate the new model version
+        - task_key: evaluate
+          notebook_task:
+            notebook_path: ./src/deploy/evaluate.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+
+        # 2. Condition gate: should we deploy?
+        - task_key: approve
+          depends_on:
+            - task_key: evaluate
+          condition_task:
+            left: "{{tasks.evaluate.values.should_deploy}}"
+            op: EQUAL_TO
+            right: "true"
+
+        # 3. Promote to Champion alias
+        - task_key: promote_champion
+          depends_on:
+            - task_key: approve
+              outcome: "true"
+          notebook_task:
+            notebook_path: ./src/deploy/promote_champion.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"

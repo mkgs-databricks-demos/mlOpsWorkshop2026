@@ -1,0 +1,8 @@
+# UC Registered Model — Champion/Challenger aliases managed by training job
+resources:
+  registered_models:
+    churn_model:
+      catalog_name: ${resources.schemas.workshop_schema.catalog_name}
+      schema_name: ${resources.schemas.workshop_schema.name}
+      name: churn_model
+      comment: "Customer churn prediction model — MLOps Workshop"

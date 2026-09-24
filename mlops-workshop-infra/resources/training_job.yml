@@ -1,0 +1,73 @@
+# Training + Promotion Job — Champion/Challenger lifecycle
+#
+# Task graph:
+#   model_training → model_validation → validation_gate
+#     → champion_challenger_comparison → promotion_gate → batch_inference
+resources:
+  jobs:
+    churn_model_training:
+      name: "[${bundle.target}] mlops-workshop-churn-training"
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026
+
+      tasks:
+        # 1. Train model with Feature Views
+        - task_key: model_training
+          notebook_task:
+            notebook_path: ./src/train/train.ipynb
+            base_parameters:
+              experiment_name: ${resources.experiments.churn_experiment.name}
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}
+
+        # 2. Validate candidate — assigns Challenger alias + validation tags
+        - task_key: model_validation
+          depends_on:
+            - task_key: model_training
+          notebook_task:
+            notebook_path: ./src/validate/validate.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+              model_version: "{{tasks.model_training.values.model_version}}"
+
+        # 3. Condition gate: did validation pass?
+        - task_key: validation_gate
+          depends_on:
+            - task_key: model_validation
+          condition_task:
+            left: "{{tasks.model_validation.values.validation_passed}}"
+            op: EQUAL_TO
+            right: "true"
+
+        # 4. Compare Challenger vs Champion — F1 > 0.75, AUC within 0.005
+        - task_key: champion_challenger_comparison
+          depends_on:
+            - task_key: validation_gate
+              outcome: "true"
+          notebook_task:
+            notebook_path: ./src/promote/promote.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+
+        # 5. Condition gate: was the model promoted?
+        - task_key: promotion_gate
+          depends_on:
+            - task_key: champion_challenger_comparison
+          condition_task:
+            left: "{{tasks.champion_challenger_comparison.values.promoted}}"
+            op: EQUAL_TO
+            right: "true"
+
+        # 6. Run batch inference with new Champion
+        - task_key: batch_inference
+          depends_on:
+            - task_key: promotion_gate
+              outcome: "true"
+          notebook_task:
+            notebook_path: ./src/inference/batch_predict.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}

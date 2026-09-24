@@ -1,0 +1,18 @@
+# Batch Inference Job — standalone, loads @Champion alias
+# Can run independently or as the final task in training_job
+resources:
+  jobs:
+    churn_batch_inference:
+      name: "[${bundle.target}] mlops-workshop-batch-inference"
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026
+
+      tasks:
+        - task_key: batch_predict
+          notebook_task:
+            notebook_path: ./src/inference/batch_predict.ipynb
+            base_parameters:
+              model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}

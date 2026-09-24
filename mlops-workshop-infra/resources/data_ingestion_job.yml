@@ -1,0 +1,87 @@
+# Data Ingestion Job — dual-path: ZeroBus API or Auto Loader
+# Gated by ${var.use_zerobus} condition task
+#
+# Task graph:
+#   create_bronze_tables → generate_ndjson → check_zerobus_gate
+#     ├─ TRUE:  post_to_zerobus
+#     └─ FALSE: write_ndjson_to_volume → autoload_to_bronze
+#   flatten_to_silver (converge, AT_LEAST_ONE_SUCCESS)
+resources:
+  jobs:
+    data_ingestion:
+      name: "[${bundle.target}] mlops-workshop-data-ingestion"
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026
+
+      tasks:
+        # 1. Create bronze tables + unified view
+        - task_key: create_bronze_tables
+          notebook_task:
+            notebook_path: ./src/data/create_bronze_tables.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}
+
+        # 2. Generate synthetic NDJSON data
+        - task_key: generate_ndjson
+          depends_on:
+            - task_key: create_bronze_tables
+          notebook_task:
+            notebook_path: ./src/data/generate_ndjson.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}
+
+        # 3. Condition gate: ZeroBus or Auto Loader?
+        - task_key: check_zerobus_gate
+          depends_on:
+            - task_key: generate_ndjson
+          condition_task:
+            left: ${var.use_zerobus}
+            op: EQUAL_TO
+            right: "true"
+
+        # 4a. TRUE path: Stream via ZeroBus API
+        - task_key: post_to_zerobus
+          depends_on:
+            - task_key: check_zerobus_gate
+              outcome: "true"
+          notebook_task:
+            notebook_path: ./src/data/post_to_zerobus.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}
+
+        # 4b. FALSE path: Write NDJSON to landing volume
+        - task_key: write_ndjson_to_volume
+          depends_on:
+            - task_key: check_zerobus_gate
+              outcome: "false"
+          notebook_task:
+            notebook_path: ./src/data/write_to_volume.ipynb
+            base_parameters:
+              volume_path: "/Volumes/${resources.schemas.workshop_schema.catalog_name}/${resources.schemas.workshop_schema.name}/${resources.volumes.landing_volume.name}"
+
+        # 5. FALSE path: Auto Loader ingests from volume → bronze_autoload
+        - task_key: autoload_to_bronze
+          depends_on:
+            - task_key: write_ndjson_to_volume
+          notebook_task:
+            notebook_path: ./src/data/autoload_to_bronze.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}
+              volume_path: "/Volumes/${resources.schemas.workshop_schema.catalog_name}/${resources.schemas.workshop_schema.name}/${resources.volumes.landing_volume.name}"
+
+        # 6. Flatten bronze → 5 silver tables (converge after either path)
+        - task_key: flatten_to_silver
+          depends_on:
+            - task_key: post_to_zerobus
+            - task_key: autoload_to_bronze
+          run_if: AT_LEAST_ONE_SUCCESS
+          notebook_task:
+            notebook_path: ./src/data/flatten_to_silver.ipynb
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.workshop_schema.name}

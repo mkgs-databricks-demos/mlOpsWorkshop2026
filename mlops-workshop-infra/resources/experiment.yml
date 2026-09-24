@@ -1,0 +1,8 @@
+# MLflow Experiment
+resources:
+  experiments:
+    churn_experiment:
+      name: "/Workspace/Users/${workspace.current_user.userName}/mlops-workshop-churn"
+      tags:
+        - key: mlflow.note.content
+          value: "Churn prediction experiment — MLOps Workshop"
