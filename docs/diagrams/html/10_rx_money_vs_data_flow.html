@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>10 -- Rx Rebate: Money Flow vs Data Flow</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D1117;color:#E6EDF3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:#161B22;border-bottom:1px solid #30363D;padding:20px 40px;display:flex;align-items:center;gap:16px}
+.logo{width:32px;height:32px;background:#077A9D;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.header-text h1{font-size:18px;font-weight:600}
+.header-text .sub{font-size:12px;color:#8B949E;margin-top:2px}
+.badge{background:#00A97222;color:#00A972;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
+.container{background:#161B22;border:1px solid #30363D;border-radius:12px;padding:40px;max-width:1400px;width:100%;overflow-x:auto}
+.mermaid{display:flex;justify-content:center}
+.mermaid svg{max-width:100%;height:auto}
+footer{background:#161B22;border-top:1px solid #30363D;padding:12px 40px;display:flex;justify-content:space-between;font-size:11px;color:#8B949E}
+.legend{display:flex;gap:16px}.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:10px;height:10px;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">Rx</div>
+<div class="header-text"><h1>10 -- Rx Rebate: Money Flow vs Data Flow</h1><span class="sub">MLOps Workshop -- Rx Rebates Use Case</span></div>
+<span class="badge">Healthcare / PBM</span>
+</header>
+<main><div class="container"><div class="mermaid" id="diagram"></div></div></main>
+<footer>
+<div class="legend">
+<div class="legend-item"><div class="legend-dot" style="background:#1B3A4B"></div><span>Stakeholders</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#077A9D"></div><span>Claims / Data</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#FFAB00"></div><span>Processing / Features</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#00A972"></div><span>Payments / Models</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#AB4057"></div><span>Monitoring</span></div>
+</div>
+<span>Source: docs/diagrams/10_rx_money_vs_data_flow.md</span>
+</footer>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:false,theme:'dark',themeVariables:{
+primaryColor:'#077A9D',primaryTextColor:'#fff',primaryBorderColor:'#30363D',
+lineColor:'#8B949E',secondaryColor:'#161B22',tertiaryColor:'#161B22',
+background:'#0D1117',mainBkg:'#161B22',nodeBorder:'#30363D',
+clusterBkg:'#161B22',clusterBorder:'#30363D',titleColor:'#E6EDF3',
+edgeLabelBackground:'#161B22'},
+flowchart:{htmlLabels:true,curve:'basis',padding:15,nodeSpacing:50,rankSpacing:60}});
+const diagram = `flowchart LR
+    subgraph "Money Flow (green)"
+        direction TB
+        M_PAT["Patient"] -->|"copay /$"| M_RX["Pharmacy"]
+        M_PBM["PBM/Plan"] -->|"claim reimbursement /$"| M_RX
+        M_MFR["Manufacturer"] -->|"retrospective rebate /$"| M_PBM
+        M_PBM -->|"pass-through or retained /$"| M_PLAN["Plan Economics"]
+    end
+
+    subgraph "Data Flow (blue)"
+        direction TB
+        D_RX["Pharmacy"] -->|"NCPDP claim"| D_PBM["PBM Adjudication"]
+        D_PBM -->|"paid/reversed claims"| D_DW["Data Warehouse"]
+        D_DW -->|"utilization file"| D_INVOICE["Rebate Invoice"]
+        D_INVOICE -->|"validation request"| D_MFR["Manufacturer"]
+        D_MFR -->|"payment + disputes"| D_SETTLE["Settlement"]
+    end
+
+    subgraph "MLOps Platform (Databricks)"
+        direction TB
+        INGEST["ZeroBus / Auto Loader<br/>Claims + Rebates + Contracts"]
+        BRONZE[("Bronze VARIANT")]
+        SILVER[("Silver Tables")]
+        FV["Feature Views"]
+        PRED["Leakage Prediction"]
+        MON["Quality Monitors"]
+    end
+
+    D_DW -.->|"claims feed"| INGEST
+    D_INVOICE -.->|"rebate feed"| INGEST
+    D_MFR -.->|"dispute feed"| INGEST
+    INGEST --> BRONZE --> SILVER --> FV --> PRED --> MON
+
+    style M_PAT fill:#00A972,color:#fff
+    style M_RX fill:#00A972,color:#fff
+    style M_PBM fill:#00A972,color:#fff
+    style M_MFR fill:#00A972,color:#fff
+    style M_PLAN fill:#00A972,color:#fff
+    style D_RX fill:#077A9D,color:#fff
+    style D_PBM fill:#077A9D,color:#fff
+    style D_DW fill:#077A9D,color:#fff
+    style D_INVOICE fill:#077A9D,color:#fff
+    style D_MFR fill:#077A9D,color:#fff
+    style D_SETTLE fill:#077A9D,color:#fff
+    style INGEST fill:#FFAB00,color:#000
+    style BRONZE fill:#077A9D,color:#fff
+    style SILVER fill:#077A9D,color:#fff
+    style FV fill:#FFAB00,color:#000
+    style PRED fill:#00A972,color:#fff
+    style MON fill:#AB4057,color:#fff`;
+const {svg} = await mermaid.render('rendered-diagram', diagram);
+document.getElementById('diagram').innerHTML = svg;
+</script>
+</body>
+</html>

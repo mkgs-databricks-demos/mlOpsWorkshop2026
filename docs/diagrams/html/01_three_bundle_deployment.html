@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>01 — Three-Bundle Deployment Sequence — MLOps Workshop</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #0D1117;
+            color: #E6EDF3;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: #161B22;
+            border-bottom: 1px solid #30363D;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: #077A9D;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+        }
+        
+        .header-text {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header-text h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #E6EDF3;
+        }
+        
+        .header-text .subtitle {
+            font-size: 12px;
+            color: #8B949E;
+            margin-top: 2px;
+        }
+        
+        .badge {
+            background: #077A9D22;
+            color: #077A9D;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .diagram-container {
+            background: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 1400px;
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        footer {
+            background: #161B22;
+            border-top: 1px solid #30363D;
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #8B949E;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">DB</div>
+        <div class="header-text">
+            <h1>01 — Three-Bundle Deployment Sequence</h1>
+            <span class="subtitle">MLOps Workshop — Design Documentation</span>
+        </div>
+        <span class="badge">Declarative Automation Bundles</span>
+    </header>
+    
+    <main>
+        <div class="diagram-container">
+            <div class="mermaid" id="diagram">
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #077A9D"></div>
+                <span>-infra bundle</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #FFAB00"></div>
+                <span>-ai bundle / gates</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #00A972"></div>
+                <span>-monitors bundle</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #FF3621"></div>
+                <span>Failure / rejection</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #8BCAE7"></div>
+                <span>Data tables</span>
+            </div>
+        </div>
+        <span>Source: docs/diagrams/01_three_bundle_deployment.md</span>
+    </footer>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#077A9D',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#30363D',
+                lineColor: '#8B949E',
+                secondaryColor: '#161B22',
+                tertiaryColor: '#161B22',
+                background: '#0D1117',
+                mainBkg: '#161B22',
+                nodeBorder: '#30363D',
+                clusterBkg: '#161B22',
+                clusterBorder: '#30363D',
+                titleColor: '#E6EDF3',
+                edgeLabelBackground: '#161B22',
+                actorBkg: '#077A9D',
+                actorBorder: '#077A9D',
+                actorTextColor: '#fff',
+                actorLineColor: '#8B949E',
+                signalColor: '#8B949E',
+                signalTextColor: '#E6EDF3',
+                noteBkgColor: '#161B22',
+                noteTextColor: '#E6EDF3',
+                noteBorderColor: '#30363D',
+                activationBkgColor: '#077A9D33',
+                activationBorderColor: '#077A9D',
+            },
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis',
+                padding: 15,
+                nodeSpacing: 50,
+                rankSpacing: 60,
+            },
+            sequence: {
+                actorMargin: 80,
+                messageMargin: 40,
+                boxMargin: 10,
+                noteMargin: 10,
+                mirrorActors: false,
+                bottomMarginAdj: 1,
+                useMaxWidth: true,
+            },
+        });
+
+        const diagram = `sequenceDiagram
+    participant Instructor as Instructor / CI
+    participant Infra as -infra Bundle
+    participant Workspace as Databricks Workspace
+    participant AI as -ai Bundle
+    participant Monitors as -monitors Bundle
+
+    Note over Instructor,Monitors: Phase 1: Infrastructure + Data + Training
+
+    Instructor->>Infra: databricks bundle deploy -t dev
+    Infra->>Workspace: Create schema (user_\${bundle.user_name})
+    Infra->>Workspace: Create volume (landing)
+    Infra->>Workspace: Create experiment
+    Infra->>Workspace: Create registered_model (empty)
+    Infra->>Workspace: Deploy jobs (ingestion, training, inference)
+
+    Instructor->>Infra: databricks bundle run -t dev data_ingestion
+    Infra->>Workspace: Generate NDJSON → Bronze (ZeroBus or Auto Loader)
+    Workspace-->>Workspace: Flatten Bronze → Silver tables
+
+    Instructor->>Infra: databricks bundle run -t dev churn_model_training
+    Workspace-->>Workspace: Train → Validate → Assign Challenger
+    Workspace-->>Workspace: Compare vs Champion → Promote
+    Workspace-->>Workspace: Batch inference → churn_predictions
+
+    Note over Instructor,Monitors: Phase 2: Serving Endpoint
+
+    Instructor->>AI: databricks bundle deploy -t dev
+    AI->>Workspace: Create model_serving_endpoint
+    AI->>Workspace: Configure AI Gateway inference table
+    Instructor->>Workspace: Send test requests
+    Workspace-->>Workspace: Auto-create churn_serving_payload table
+
+    Note over Instructor,Monitors: Phase 3: Monitoring + Dashboard
+
+    Instructor->>Monitors: databricks bundle deploy -t dev
+    Monitors->>Workspace: Create predictions_monitor
+    Monitors->>Workspace: Create features_monitor
+    Monitors->>Workspace: Create serving_monitor
+    Monitors->>Workspace: Deploy MLOps dashboard (serialized)
+    Monitors->>Workspace: Deploy retraining_trigger job`;
+        
+        const { svg } = await mermaid.render('rendered-diagram', diagram);
+        document.getElementById('diagram').innerHTML = svg;
+    </script>
+</body>
+</html>

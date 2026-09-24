@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>07 -- Rx Rebate Lifecycle: From Contract to Leakage Detection</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D1117;color:#E6EDF3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:#161B22;border-bottom:1px solid #30363D;padding:20px 40px;display:flex;align-items:center;gap:16px}
+.logo{width:32px;height:32px;background:#077A9D;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.header-text h1{font-size:18px;font-weight:600}
+.header-text .sub{font-size:12px;color:#8B949E;margin-top:2px}
+.badge{background:#00A97222;color:#00A972;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
+.container{background:#161B22;border:1px solid #30363D;border-radius:12px;padding:40px;max-width:1400px;width:100%;overflow-x:auto}
+.mermaid{display:flex;justify-content:center}
+.mermaid svg{max-width:100%;height:auto}
+footer{background:#161B22;border-top:1px solid #30363D;padding:12px 40px;display:flex;justify-content:space-between;font-size:11px;color:#8B949E}
+.legend{display:flex;gap:16px}.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:10px;height:10px;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">Rx</div>
+<div class="header-text"><h1>07 -- Rx Rebate Lifecycle: From Contract to Leakage Detection</h1><span class="sub">MLOps Workshop -- Rx Rebates Use Case</span></div>
+<span class="badge">Healthcare / PBM</span>
+</header>
+<main><div class="container"><div class="mermaid" id="diagram"></div></div></main>
+<footer>
+<div class="legend">
+<div class="legend-item"><div class="legend-dot" style="background:#1B3A4B"></div><span>Stakeholders</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#077A9D"></div><span>Claims / Data</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#FFAB00"></div><span>Processing / Features</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#00A972"></div><span>Payments / Models</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#AB4057"></div><span>Monitoring</span></div>
+</div>
+<span>Source: docs/diagrams/07_rx_rebate_lifecycle.md</span>
+</footer>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:false,theme:'dark',themeVariables:{
+primaryColor:'#077A9D',primaryTextColor:'#fff',primaryBorderColor:'#30363D',
+lineColor:'#8B949E',secondaryColor:'#161B22',tertiaryColor:'#161B22',
+background:'#0D1117',mainBkg:'#161B22',nodeBorder:'#30363D',
+clusterBkg:'#161B22',clusterBorder:'#30363D',titleColor:'#E6EDF3',
+edgeLabelBackground:'#161B22'},
+flowchart:{htmlLabels:true,curve:'basis',padding:15,nodeSpacing:50,rankSpacing:60}});
+const diagram = `flowchart TB
+    subgraph "Stage A: Contracting"
+        MFR["Drug Manufacturer"]
+        CONTRACT["Rebate Contract<br/>Product, market share,<br/>tier, rate, exclusions"]
+        PBM["PBM / Rebate Aggregator"]
+    end
+
+    subgraph "Stage B: Formulary Design"
+        FORM["Formulary Rules<br/>Tier, PA, step therapy,<br/>quantity limits"]
+        PLAN["Health Plan<br/>Approves benefit design"]
+    end
+
+    subgraph "Stage C: Claims Adjudication"
+        RX["Pharmacy<br/>Dispenses Rx"]
+        CLAIM["Real-time Claim<br/>Eligibility, formulary,<br/>cost share, reimbursement"]
+        PAID[("Paid Claims<br/>Ledger")]
+    end
+
+    subgraph "Stage D: Rebate Processing"
+        UTIL["Utilization Aggregation<br/>Eligible claims, NDC mapping,<br/>exclusions, reversals"]
+        INVOICE["Rebate Invoice<br/>Eligible qty x rate<br/>- exclusions +/- adjustments"]
+        VALIDATE["Manufacturer Validation<br/>Accept / Dispute / Audit"]
+        PAYMENT["Rebate Payment"]
+    end
+
+    subgraph "Stage E: Settlement"
+        SETTLE["PBM/Plan Settlement<br/>Pass-through, retention,<br/>admin fees, DIR"]
+        ECON["Plan Economics<br/>Premium, benefit,<br/>employer contribution"]
+    end
+
+    subgraph "LEAKAGE DETECTION (MLOps Workshop)"
+        direction LR
+        BRONZE[("Bronze<br/>Claims + Rebates<br/>+ Contracts")]
+        SILVER[("Silver<br/>Typed entities")]
+        FEATURES["Feature Views<br/>Claim volume trends<br/>Rebate payment patterns<br/>Dispute velocity"]
+        MODEL["Leakage Prediction<br/>@Champion model"]
+        MONITOR["Quality Monitors<br/>Drift + accuracy"]
+    end
+
+    MFR --> CONTRACT --> PBM
+    PBM --> FORM --> PLAN
+    PLAN --> RX --> CLAIM --> PAID
+    PAID --> UTIL --> INVOICE --> VALIDATE --> PAYMENT
+    PAYMENT --> SETTLE --> ECON
+
+    PAID -.->|"claims data"| BRONZE
+    INVOICE -.->|"rebate data"| BRONZE
+    CONTRACT -.->|"contract terms"| BRONZE
+    BRONZE --> SILVER --> FEATURES --> MODEL --> MONITOR
+    MONITOR -.->|"drift alert"| MODEL
+
+    style MFR fill:#1B3A4B,color:#fff
+    style PBM fill:#1B3A4B,color:#fff
+    style PLAN fill:#1B3A4B,color:#fff
+    style RX fill:#077A9D,color:#fff
+    style CLAIM fill:#077A9D,color:#fff
+    style PAID fill:#077A9D,color:#fff
+    style UTIL fill:#FFAB00,color:#000
+    style INVOICE fill:#FFAB00,color:#000
+    style VALIDATE fill:#FFAB00,color:#000
+    style PAYMENT fill:#00A972,color:#fff
+    style SETTLE fill:#00A972,color:#fff
+    style ECON fill:#00A972,color:#fff
+    style BRONZE fill:#077A9D,color:#fff
+    style SILVER fill:#077A9D,color:#fff
+    style FEATURES fill:#FFAB00,color:#000
+    style MODEL fill:#00A972,color:#fff
+    style MONITOR fill:#AB4057,color:#fff`;
+const {svg} = await mermaid.render('rendered-diagram', diagram);
+document.getElementById('diagram').innerHTML = svg;
+</script>
+</body>
+</html>

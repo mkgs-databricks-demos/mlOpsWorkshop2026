@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MLOps Workshop -- Architecture Diagrams</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D1117;color:#E6EDF3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+header{background:#161B22;border-bottom:1px solid #30363D;padding:32px 40px}
+.header-row{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.logo{width:40px;height:40px;background:#077A9D;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff}
+h1{font-size:24px;font-weight:600}
+.subtitle{color:#8B949E;font-size:14px;margin-left:56px}
+main{max-width:1000px;margin:40px auto;padding:0 40px}
+.card{background:#161B22;border:1px solid #30363D;border-radius:12px;padding:24px 28px;margin-bottom:16px;text-decoration:none;color:inherit;display:block;transition:border-color 0.2s,transform 0.1s}
+.card:hover{border-color:#077A9D;transform:translateY(-2px)}
+.card-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.card-number{background:#077A9D22;color:#077A9D;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.card-number.rx{background:#00A97222;color:#00A972}
+.card-title{font-size:16px;font-weight:600}
+.card-desc{color:#8B949E;font-size:13px;line-height:1.5;margin-left:44px}
+.section-label{color:#8B949E;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px 0}
+footer{text-align:center;padding:40px;color:#8B949E;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<div class="header-row"><div class="logo">DB</div><h1>MLOps Workshop -- Architecture Diagrams</h1></div>
+<p class="subtitle">10 diagrams: 6 platform architecture + 4 Rx Rebates domain context</p>
+</header>
+<main>
+<p class="section-label">Platform Architecture</p>
+<a href="01_three_bundle_deployment.html" class="card">
+<div class="card-header"><div class="card-number">01</div><span class="card-title">Three-Bundle Deployment Sequence</span></div>
+<p class="card-desc">Sequence diagram showing the ordered deployment of -infra, -ai, -monitors bundles and the jobs that run between each.</p>
+</a>
+<a href="02_data_ingestion_flow.html" class="card">
+<div class="card-header"><div class="card-number">02</div><span class="card-title">Dual-Path Data Ingestion Flow</span></div>
+<p class="card-desc">Flowchart showing the use_zerobus condition gate routing data through either ZeroBus SDK or Auto Loader, converging at bronze_unified to Silver.</p>
+</a>
+<p class="section-label">Model Lifecycle</p>
+<a href="03_champion_challenger_flow.html" class="card">
+<div class="card-header"><div class="card-number">03</div><span class="card-title">Champion/Challenger Promotion Flow</span></div>
+<p class="card-desc">Flowchart showing the full model lifecycle: Train, Validate, Assign Challenger, Compare vs Champion, Promote or Reject, with MLflow 3 deployment job.</p>
+</a>
+<a href="04_retraining_loop.html" class="card">
+<div class="card-header"><div class="card-number">04</div><span class="card-title">Closed-Loop Retraining Architecture</span></div>
+<p class="card-desc">Flowchart showing how quality monitors feed drift/profile metrics into the retraining trigger job, which kicks off training, deployment, back to monitoring.</p>
+</a>
+<p class="section-label">System Overview</p>
+<a href="05_bundle_resource_dependencies.html" class="card">
+<div class="card-header"><div class="card-number">05</div><span class="card-title">Bundle Resource Dependency Graph</span></div>
+<p class="card-desc">Left-to-right graph showing all 14 bundle resources across three bundles and their dependency relationships.</p>
+</a>
+<a href="06_end_to_end_lifecycle.html" class="card">
+<div class="card-header"><div class="card-number">06</div><span class="card-title">End-to-End MLOps Lifecycle</span></div>
+<p class="card-desc">Top-to-bottom overview of the complete data, feature, training, promotion, serving, monitoring, retraining lifecycle.</p>
+</a>
+<p class="section-label">Rx Rebates Domain</p>
+<a href="07_rx_rebate_lifecycle.html" class="card">
+<div class="card-header"><div class="card-number rx">07</div><span class="card-title">Rx Rebate Lifecycle: Contract to Leakage Detection</span></div>
+<p class="card-desc">End-to-end pharmacy rebate flow from manufacturer contracting through claims adjudication, rebate processing, settlement, and into the MLOps leakage detection platform.</p>
+</a>
+<a href="08_domain_mapping.html" class="card">
+<div class="card-header"><div class="card-number rx">08</div><span class="card-title">Workshop to Rx Rebates Domain Mapping</span></div>
+<p class="card-desc">Side-by-side mapping of generic workshop entities (customer, usage, billing, support, churn) to Rx Rebates domain equivalents (contract, claims, rebates, disputes, leakage).</p>
+</a>
+<a href="09_rx_feature_engineering.html" class="card">
+<div class="card-header"><div class="card-number rx">09</div><span class="card-title">Rx Rebate Leakage: Feature Engineering to Prediction</span></div>
+<p class="card-desc">Silver tables through declarative Feature Views (claim volume, rebate trends, dispute velocity, market share) into training, Champion model, and batch/serving prediction.</p>
+</a>
+<a href="10_rx_money_vs_data_flow.html" class="card">
+<div class="card-header"><div class="card-number rx">10</div><span class="card-title">Rx Rebate: Money Flow vs Data Flow</span></div>
+<p class="card-desc">Parallel view of the financial flow (copay, reimbursement, rebate, settlement) alongside the data flow (NCPDP claims, utilization, invoices) feeding into the Databricks MLOps platform.</p>
+</a>
+</main>
+<footer>MLOps Workshop -- Declarative Automation Bundles + Declarative Feature Store<br>Healthcare / Rx Rebates Pre-Sales</footer>
+</body>
+</html>

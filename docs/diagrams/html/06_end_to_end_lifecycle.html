@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>06 — End-to-End MLOps Lifecycle — MLOps Workshop</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #0D1117;
+            color: #E6EDF3;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: #161B22;
+            border-bottom: 1px solid #30363D;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: #077A9D;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+        }
+        
+        .header-text {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header-text h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #E6EDF3;
+        }
+        
+        .header-text .subtitle {
+            font-size: 12px;
+            color: #8B949E;
+            margin-top: 2px;
+        }
+        
+        .badge {
+            background: #077A9D22;
+            color: #077A9D;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .diagram-container {
+            background: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 1400px;
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        footer {
+            background: #161B22;
+            border-top: 1px solid #30363D;
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #8B949E;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">DB</div>
+        <div class="header-text">
+            <h1>06 — End-to-End MLOps Lifecycle</h1>
+            <span class="subtitle">MLOps Workshop — Design Documentation</span>
+        </div>
+        <span class="badge">Declarative Automation Bundles</span>
+    </header>
+    
+    <main>
+        <div class="diagram-container">
+            <div class="mermaid" id="diagram">
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #077A9D"></div>
+                <span>-infra bundle</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #FFAB00"></div>
+                <span>-ai bundle / gates</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #00A972"></div>
+                <span>-monitors bundle</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #FF3621"></div>
+                <span>Failure / rejection</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #8BCAE7"></div>
+                <span>Data tables</span>
+            </div>
+        </div>
+        <span>Source: docs/diagrams/06_end_to_end_lifecycle.md</span>
+    </footer>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#077A9D',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#30363D',
+                lineColor: '#8B949E',
+                secondaryColor: '#161B22',
+                tertiaryColor: '#161B22',
+                background: '#0D1117',
+                mainBkg: '#161B22',
+                nodeBorder: '#30363D',
+                clusterBkg: '#161B22',
+                clusterBorder: '#30363D',
+                titleColor: '#E6EDF3',
+                edgeLabelBackground: '#161B22',
+                actorBkg: '#077A9D',
+                actorBorder: '#077A9D',
+                actorTextColor: '#fff',
+                actorLineColor: '#8B949E',
+                signalColor: '#8B949E',
+                signalTextColor: '#E6EDF3',
+                noteBkgColor: '#161B22',
+                noteTextColor: '#E6EDF3',
+                noteBorderColor: '#30363D',
+                activationBkgColor: '#077A9D33',
+                activationBorderColor: '#077A9D',
+            },
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis',
+                padding: 15,
+                nodeSpacing: 50,
+                rankSpacing: 60,
+            },
+            sequence: {
+                actorMargin: 80,
+                messageMargin: 40,
+                boxMargin: 10,
+                noteMargin: 10,
+                mirrorActors: false,
+                bottomMarginAdj: 1,
+                useMaxWidth: true,
+            },
+        });
+
+        const diagram = `flowchart TB
+    subgraph "Data Layer"
+        direction LR
+        SRC["External Data<br/>(API / Files)"]
+        GATE{"use_zerobus?"}
+        ZB["ZeroBus SDK"]
+        AL["Auto Loader"]
+        BZ[("Bronze<br/>VARIANT")]
+        SV[("Silver<br/>Typed tables")]
+    end
+
+    subgraph "Feature Layer"
+        direction LR
+        FV["Feature Views<br/>(declarative)"]
+        OFF[("Offline Store<br/>Delta")]
+        ON[("Online Store")]
+    end
+
+    subgraph "Training Layer"
+        direction LR
+        TS["create_training_set()<br/>Point-in-time correct"]
+        MLFLOW["MLflow 3<br/>Experiment tracking"]
+        UC_MODEL[("UC Registered Model<br/>+ aliases")]
+    end
+
+    subgraph "Promotion Layer"
+        direction LR
+        VALIDATE["Validate<br/>→ Challenger alias"]
+        COMPARE["Compare<br/>Challenger vs Champion"]
+        PROMOTE["Promote<br/>→ Champion alias"]
+        DEPLOY_JOB["MLflow 3<br/>Deployment Job"]
+    end
+
+    subgraph "Serving Layer"
+        direction LR
+        BATCH_INF["Batch Inference<br/>@Champion → predictions"]
+        ENDPOINT["Model Serving<br/>Endpoint + AI Gateway"]
+    end
+
+    subgraph "Monitoring Layer"
+        direction LR
+        Q_MON["Quality Monitors<br/>(3 monitors)"]
+        DASH["MLOps Dashboard"]
+        RETRAIN["Retraining<br/>Trigger"]
+    end
+
+    SRC --> GATE
+    GATE -->|true| ZB --> BZ
+    GATE -->|false| AL --> BZ
+    BZ -->|"parse_json()"| SV
+    SV --> FV
+    FV --> OFF
+    FV --> ON
+    OFF --> TS --> MLFLOW --> UC_MODEL
+    UC_MODEL --> VALIDATE --> COMPARE --> PROMOTE
+    UC_MODEL -.-> DEPLOY_JOB
+    PROMOTE --> BATCH_INF
+    ON --> ENDPOINT
+    UC_MODEL --> ENDPOINT
+    BATCH_INF --> Q_MON
+    ENDPOINT --> Q_MON
+    Q_MON --> DASH
+    Q_MON --> RETRAIN
+    RETRAIN -.->|"triggers"| TS
+
+    style SRC fill:#1B3A4B,color:#fff
+    style BZ fill:#077A9D,color:#fff
+    style SV fill:#077A9D,color:#fff
+    style FV fill:#FFAB00,color:#000
+    style OFF fill:#8BCAE7,color:#000
+    style ON fill:#8BCAE7,color:#000
+    style MLFLOW fill:#077A9D,color:#fff
+    style UC_MODEL fill:#077A9D,color:#fff
+    style VALIDATE fill:#FFAB00,color:#000
+    style PROMOTE fill:#00A972,color:#fff
+    style DEPLOY_JOB fill:#AB4057,color:#fff
+    style BATCH_INF fill:#8BCAE7,color:#000
+    style ENDPOINT fill:#FFAB00,color:#000
+    style Q_MON fill:#00A972,color:#fff
+    style DASH fill:#00A972,color:#fff
+    style RETRAIN fill:#AB4057,color:#fff`;
+        
+        const { svg } = await mermaid.render('rendered-diagram', diagram);
+        document.getElementById('diagram').innerHTML = svg;
+    </script>
+</body>
+</html>

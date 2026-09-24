@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>09 -- Rx Rebate Leakage: Feature Engineering to Prediction</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D1117;color:#E6EDF3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:#161B22;border-bottom:1px solid #30363D;padding:20px 40px;display:flex;align-items:center;gap:16px}
+.logo{width:32px;height:32px;background:#077A9D;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.header-text h1{font-size:18px;font-weight:600}
+.header-text .sub{font-size:12px;color:#8B949E;margin-top:2px}
+.badge{background:#00A97222;color:#00A972;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;margin-left:auto}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px}
+.container{background:#161B22;border:1px solid #30363D;border-radius:12px;padding:40px;max-width:1400px;width:100%;overflow-x:auto}
+.mermaid{display:flex;justify-content:center}
+.mermaid svg{max-width:100%;height:auto}
+footer{background:#161B22;border-top:1px solid #30363D;padding:12px 40px;display:flex;justify-content:space-between;font-size:11px;color:#8B949E}
+.legend{display:flex;gap:16px}.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:10px;height:10px;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">Rx</div>
+<div class="header-text"><h1>09 -- Rx Rebate Leakage: Feature Engineering to Prediction</h1><span class="sub">MLOps Workshop -- Rx Rebates Use Case</span></div>
+<span class="badge">Healthcare / PBM</span>
+</header>
+<main><div class="container"><div class="mermaid" id="diagram"></div></div></main>
+<footer>
+<div class="legend">
+<div class="legend-item"><div class="legend-dot" style="background:#1B3A4B"></div><span>Stakeholders</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#077A9D"></div><span>Claims / Data</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#FFAB00"></div><span>Processing / Features</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#00A972"></div><span>Payments / Models</span></div>
+<div class="legend-item"><div class="legend-dot" style="background:#AB4057"></div><span>Monitoring</span></div>
+</div>
+<span>Source: docs/diagrams/09_rx_feature_engineering.md</span>
+</footer>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:false,theme:'dark',themeVariables:{
+primaryColor:'#077A9D',primaryTextColor:'#fff',primaryBorderColor:'#30363D',
+lineColor:'#8B949E',secondaryColor:'#161B22',tertiaryColor:'#161B22',
+background:'#0D1117',mainBkg:'#161B22',nodeBorder:'#30363D',
+clusterBkg:'#161B22',clusterBorder:'#30363D',titleColor:'#E6EDF3',
+edgeLabelBackground:'#161B22'},
+flowchart:{htmlLabels:true,curve:'basis',padding:15,nodeSpacing:50,rankSpacing:60}});
+const diagram = `flowchart TB
+    subgraph "Silver Tables (from Bronze VARIANT)"
+        CONTRACTS[("contract_profiles<br/>manufacturer, PBM,<br/>therapeutic area")]
+        CLAIMS[("claim_utilization<br/>daily claim volume,<br/>formulary tier, market share")]
+        REBATES[("rebate_payments<br/>quarterly amounts,<br/>payment status")]
+        DISPUTES[("disputes_audits<br/>dispute tickets,<br/>audit findings")]
+    end
+
+    subgraph "Declarative Feature Views"
+        F1["avg_daily_claims_30d<br/>Avg(claim_volume)<br/>TumblingWindow 30d"]
+        F2["rebate_payment_trend_90d<br/>Sum(rebate_amount)<br/>TumblingWindow 90d"]
+        F3["dispute_velocity_7d<br/>Count(dispute_id)<br/>SlidingWindow 7d/1d"]
+        F4["market_share_delta_30d<br/>Avg(market_share_pct)<br/>TumblingWindow 30d"]
+        F5["overdue_rebate_count_90d<br/>Count(*) where overdue<br/>TumblingWindow 90d"]
+        F6["escalated_disputes_30d<br/>Count(*) where escalated<br/>TumblingWindow 30d"]
+    end
+
+    subgraph "Training"
+        TS["create_training_set()<br/>Point-in-time correct<br/>join on manufacturer_id"]
+        TRAIN["GBM / XGBoost<br/>MLflow experiment<br/>Feature lineage"]
+        UC_MODEL["UC Registered Model<br/>@Champion alias"]
+    end
+
+    subgraph "Prediction"
+        BATCH["Batch Inference<br/>models:/.../leakage_model@Champion<br/>Auto feature lookup"]
+        SERVE["Model Serving<br/>Real-time leakage score<br/>per contract query"]
+        PRED[("leakage_predictions<br/>leakage_probability,<br/>model_version")]
+    end
+
+    CLAIMS --> F1
+    REBATES --> F2
+    DISPUTES --> F3
+    CLAIMS --> F4
+    REBATES --> F5
+    DISPUTES --> F6
+
+    F1 & F2 & F3 & F4 & F5 & F6 --> TS
+    TS --> TRAIN --> UC_MODEL
+    UC_MODEL --> BATCH --> PRED
+    UC_MODEL --> SERVE
+
+    style CONTRACTS fill:#1B3A4B,color:#fff
+    style CLAIMS fill:#077A9D,color:#fff
+    style REBATES fill:#077A9D,color:#fff
+    style DISPUTES fill:#077A9D,color:#fff
+    style F1 fill:#FFAB00,color:#000
+    style F2 fill:#FFAB00,color:#000
+    style F3 fill:#FFAB00,color:#000
+    style F4 fill:#FFAB00,color:#000
+    style F5 fill:#FFAB00,color:#000
+    style F6 fill:#FFAB00,color:#000
+    style TS fill:#8BCAE7,color:#000
+    style TRAIN fill:#077A9D,color:#fff
+    style UC_MODEL fill:#00A972,color:#fff
+    style BATCH fill:#8BCAE7,color:#000
+    style SERVE fill:#8BCAE7,color:#000
+    style PRED fill:#00A972,color:#fff`;
+const {svg} = await mermaid.render('rendered-diagram', diagram);
+document.getElementById('diagram').innerHTML = svg;
+</script>
+</body>
+</html>
