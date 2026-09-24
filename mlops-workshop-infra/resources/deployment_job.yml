@@ -9,17 +9,19 @@ resources:
       tags:
         bundle: mlops-workshop-infra
         workshop: mlops-workshop-2026
-      trigger:
-        model_update:
-          model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
-          events:
-            - MODEL_VERSION_READY
+      # TODO: model_update trigger — requires CLI support for MODEL_VERSION_READY events
+      # Uncomment when CLI version supports this field:
+      # trigger:
+      #   model_update:
+      #     model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
+      #     events:
+      #       - MODEL_VERSION_READY
 
       tasks:
         # 1. Evaluate the new model version
         - task_key: evaluate
           notebook_task:
-            notebook_path: ./src/deploy/evaluate.ipynb
+            notebook_path: ../src/deploy/evaluate.ipynb
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
 
@@ -38,6 +40,6 @@ resources:
             - task_key: approve
               outcome: "true"
           notebook_task:
-            notebook_path: ./src/deploy/promote_champion.ipynb
+            notebook_path: ../src/deploy/promote_champion.ipynb
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"

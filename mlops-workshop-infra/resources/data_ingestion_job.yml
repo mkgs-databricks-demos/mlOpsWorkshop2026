@@ -18,7 +18,7 @@ resources:
         # 1. Create bronze tables + unified view
         - task_key: create_bronze_tables
           notebook_task:
-            notebook_path: ./src/data/create_bronze_tables.ipynb
+            notebook_path: ../src/data/create_bronze_tables.ipynb
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
@@ -28,7 +28,7 @@ resources:
           depends_on:
             - task_key: create_bronze_tables
           notebook_task:
-            notebook_path: ./src/data/generate_ndjson.ipynb
+            notebook_path: ../src/data/generate_ndjson.ipynb
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
@@ -48,7 +48,7 @@ resources:
             - task_key: check_zerobus_gate
               outcome: "true"
           notebook_task:
-            notebook_path: ./src/data/post_to_zerobus.ipynb
+            notebook_path: ../src/data/post_to_zerobus.ipynb
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
@@ -59,7 +59,7 @@ resources:
             - task_key: check_zerobus_gate
               outcome: "false"
           notebook_task:
-            notebook_path: ./src/data/write_to_volume.ipynb
+            notebook_path: ../src/data/write_to_volume.ipynb
             base_parameters:
               volume_path: "/Volumes/${resources.schemas.workshop_schema.catalog_name}/${resources.schemas.workshop_schema.name}/${resources.volumes.landing_volume.name}"
 
@@ -68,7 +68,7 @@ resources:
           depends_on:
             - task_key: write_ndjson_to_volume
           notebook_task:
-            notebook_path: ./src/data/autoload_to_bronze.ipynb
+            notebook_path: ../src/data/autoload_to_bronze.ipynb
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
@@ -81,7 +81,7 @@ resources:
             - task_key: autoload_to_bronze
           run_if: AT_LEAST_ONE_SUCCESS
           notebook_task:
-            notebook_path: ./src/data/flatten_to_silver.ipynb
+            notebook_path: ../src/data/flatten_to_silver.ipynb
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}

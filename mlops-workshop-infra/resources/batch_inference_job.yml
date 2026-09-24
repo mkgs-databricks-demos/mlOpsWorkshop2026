@@ -11,7 +11,7 @@ resources:
       tasks:
         - task_key: batch_predict
           notebook_task:
-            notebook_path: ./src/inference/batch_predict.ipynb
+            notebook_path: ../src/inference/batch_predict.ipynb
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
               catalog: ${var.catalog}

@@ -4,7 +4,7 @@ resources:
     workshop_schema:
       catalog_name: ${var.catalog}
       name: ${var.user_schema}
-      comment: "MLOps workshop schema for ${bundle.user_name}"
+      comment: "MLOps workshop schema for ${workspace.current_user.short_name}"
 
   volumes:
     landing_volume:

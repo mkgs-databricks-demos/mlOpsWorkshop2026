@@ -6,9 +6,10 @@ bundle:
 variables:
   catalog:
     description: "Customer-provided Unity Catalog (USE CATALOG + CREATE SCHEMA)"
-    default: "mlops_workshop"
+    default: hls_fde_dev  
   user_schema:
     description: "Per-participant schema name"
+    default: "mlops_workshop"
   use_zerobus:
     description: "Route data through ZeroBus API (true) or Auto Loader (false)"
     default: "false"
@@ -24,8 +25,8 @@ targets:
     workspace:
       host: https://fevm-hls-fde.cloud.databricks.com
     variables:
-      catalog: mlops_workshop
-      user_schema: "user_${bundle.user_name}"
+      catalog: hls_fde_dev
+      user_schema: mlops_workshop
 
   prod:
     mode: production
