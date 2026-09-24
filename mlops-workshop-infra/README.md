@@ -70,7 +70,7 @@ mlops-workshop-infra/
 │   │   ├── feature_definitions.py  # Declarative Feature Views (6 UC features, reference only)
 │   │   ├── feature_tables_classic.py  # Classic Feature Store (2 feature tables, active)
 │   │   └── train.py               # LightGBM training: nested CV, feature pruning, MLflow
-│   ├── validate/               # Model validation
+│   ├── validate/               # Model validation (metric gates, smoke test, Challenger alias)
 │   ├── promote/                # Champion/Challenger promotion
 │   ├── deploy/                 # MLflow 3 deployment
 │   └── inference/              # Batch prediction

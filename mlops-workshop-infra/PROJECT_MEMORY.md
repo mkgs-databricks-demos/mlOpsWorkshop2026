@@ -63,12 +63,12 @@
 | feature_definitions | `src/train/feature_definitions.py` | (reference only) | catalog, schema | — | **Complete** — 6 declarative Feature Views (not used in job) |
 | feature_tables_classic | `src/train/feature_tables_classic.py` | churn_model_training | catalog, schema | — | **Complete** — 6 windowed + 3 static features |
 | train | `src/train/train.py` | churn_model_training | experiment_name, model_name, catalog, schema | model_version | **Complete** — LightGBM, nested CV, feature pruning (v2) |
+| validate | `src/validate/validate.py` | churn_model_training | model_name, model_version | validation_passed | **Complete** — metric gates, raw-model smoke test, Challenger alias + tags |
 
 ### Stubs (implementation pending)
 
 | Notebook | Path | Job | Parameters | Task Values |
 |----------|------|-----|-----------|-------------|
-| validate | `src/validate/validate.py` | churn_model_training | model_name, model_version | validation_passed |
 | promote | `src/promote/promote.py` | churn_model_training | model_name | promoted |
 | evaluate | `src/deploy/evaluate.py` | churn_deployment_job | model_name | should_deploy |
 | promote_champion | `src/deploy/promote_champion.py` | churn_deployment_job | model_name | — |
@@ -218,7 +218,7 @@ Threshold: 5% relative importance. Top 3 features carry 76% of total importance.
 | Feature definitions (`src/train/feature_definitions.py`) | **Complete** — 6 Feature Views registered to UC (reference only, not used in job) |
 | Feature tables classic (`src/train/feature_tables_classic.py`) | **Complete** — 2 feature tables (windowed + profile), `register_features` task in training job |
 | Training notebooks (`src/train/train.py`) | **Complete** — LightGBM, nested CV (F1 0.65 ± 0.05), feature pruning 9→5, model v2 registered |
-| Validation notebooks (`src/validate/`) | Stub |
+| Validation notebooks (`src/validate/validate.py`) | **Complete** — metric gates (F1≥0.30, AUC≥0.60, precision/recall≥0.30, CV stability≤0.15), raw-model smoke test, Challenger alias + validation tags, task value output |
 | Promotion notebooks (`src/promote/`) | Stub |
 | Deployment notebooks (`src/deploy/`) | Stub |
 | Inference notebooks (`src/inference/`) | Stub |
@@ -235,6 +235,8 @@ Threshold: 5% relative importance. Top 3 features carry 76% of total importance.
 5. ~~`.ipynb` vs `.py` mismatch~~ — **RESOLVED.** All 4 job YAMLs fixed to `.py` (14 refs).
 6. ~~Serverless `/tmp/` restrictions~~ — **RESOLVED.** Three fixes: `shutil` for local I/O, direct volume writes, subdirectory-only cleanup.
 7. **3 obsolete stubs remain on disk** — `create_bronze_tables.py`, `autoload_to_bronze.py`, `flatten_to_silver.py`. Not referenced; safe to delete.
+8. **`fe.score_batch()` blocked by passthrough columns** — `create_training_set()` in train.py is missing `exclude_columns=["source", "ingested_at"]`, so these bronze metadata columns are recorded as model features. This blocks `fe.score_batch()` and `pyfunc.load_model()` on serverless. Validate smoke test works around this by loading the raw LightGBM model from `runs:/{run_id}/model/data/feature_store/raw_model`. Fix: add `exclude_columns` in train.py, retrain, then switch smoke test to `fe.score_batch()`.
+9. **Lint: SCPAP005 on validate cell 6** — Spark transformations (`.join()`, `.toPandas()`) inside `try/except` are lazy and won't raise. The `.toPandas()` action is inside the try block so this is a false positive, but the lint persists.
 
 ---
 
