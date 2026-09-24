@@ -130,6 +130,8 @@ outer_importances = []
 print("Nested Cross-Validation (5 outer \u00d7 30 inner trials \u00d7 4 inner folds)")
 print("=" * 65)
 
+parent_run = mlflow.start_run(run_name="nested_cv_evaluation")
+
 for fold_idx, (train_idx, val_idx) in enumerate(outer_cv.split(X_train, y_train)):
     X_of_train = X_train.iloc[train_idx]
     X_of_val   = X_train.iloc[val_idx]
@@ -167,7 +169,20 @@ for fold_idx, (train_idx, val_idx) in enumerate(outer_cv.split(X_train, y_train)
     outer_scores.append(fold_f1)
     outer_importances.append(mdl.feature_importances_)
 
+    # Log fold as child run in MLflow experiment
+    with mlflow.start_run(run_name=f"outer_fold_{fold_idx+1}", nested=True):
+        mlflow.log_params(study.best_params)
+        mlflow.log_metric("fold_f1", fold_f1)
+        mlflow.log_metric("inner_best_cv_f1", study.best_value)
+
     print(f"  Fold {fold_idx + 1}: F1 = {fold_f1:.4f}  (inner best: {study.best_value:.4f})")
+
+# Log aggregate metrics on parent run
+mlflow.log_metric("nested_cv_f1_mean", float(np.mean(outer_scores)))
+mlflow.log_metric("nested_cv_f1_std", float(np.std(outer_scores)))
+for i, s in enumerate(outer_scores):
+    mlflow.log_metric(f"outer_fold_{i+1}_f1", s)
+mlflow.end_run()
 
 print("=" * 65)
 print(f"Nested CV F1: {np.mean(outer_scores):.4f} \u00b1 {np.std(outer_scores):.4f}")
