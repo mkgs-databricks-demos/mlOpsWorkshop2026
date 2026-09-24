@@ -60,12 +60,13 @@
 | generate_ndjson | `src/data/generate_ndjson.py` | data_ingestion | catalog, schema, volume_path | ndjson_path, record_count | **Complete** |
 | post_to_zerobus | `src/data/post_to_zerobus.py` | data_ingestion | catalog, schema | — | Placeholder |
 | write_to_volume | `src/data/write_to_volume.py` | (standalone only) | volume_path | — | **Complete** (not in job) |
+| feature_definitions | `src/train/feature_definitions.py` | churn_model_training* | catalog, schema | — | **Complete** — 6 Feature Views |
+| feature_tables_classic | `src/train/feature_tables_classic` | (standalone) | catalog, schema | — | **Complete** — classic comparison |
 
 ### Stubs (implementation pending)
 
 | Notebook | Path | Job | Parameters | Task Values |
 |----------|------|-----|-----------|-------------|
-| feature_definitions | `src/train/feature_definitions.py` | churn_model_training* | catalog, schema | — |
 | train | `src/train/train.py` | churn_model_training | experiment_name, model_name, catalog, schema | model_version |
 | validate | `src/validate/validate.py` | churn_model_training | model_name, model_version | validation_passed |
 | promote | `src/promote/promote.py` | churn_model_training | model_name | promoted |
@@ -74,6 +75,21 @@
 | batch_predict | `src/inference/batch_predict.py` | churn_batch_inference | model_name, catalog, schema | — |
 
 \* `feature_definitions` task not yet in YAML — pending addition to `training_job.yml`
+
+### UC Feature Objects
+
+| Object | Type | Source |
+|--------|------|--------|
+| `avg_daily_sessions_30d` | Feature (View) | `product_usage_events_fv` |
+| `max_api_calls_7d` | Feature (View) | `product_usage_events_fv` |
+| `total_revenue_90d` | Feature (View) | `billing_history_fv` |
+| `overdue_payment_count_90d` | Feature (View) | `billing_history_overdue_fv` |
+| `support_tickets_7d` | Feature (View) | `support_interactions` |
+| `escalated_tickets_30d` | Feature (View) | `support_interactions` |
+| `churn_windowed_features` | Feature Table | Classic — 6 windowed features, PK: customer_id + observation_date |
+| `churn_profile_features` | Feature Table | Classic — 3 static features, PK: customer_id |
+
+Helper views (DATE→TIMESTAMP cast): `product_usage_events_fv`, `billing_history_fv`, `billing_history_overdue_fv`
 
 ### Obsolete (to delete)
 
@@ -162,7 +178,8 @@ Validated by EDA (see `docs/design/feature-engineering-design.md` for full stati
 | Data prep job (end-to-end) | **Complete** — `bundle run` succeeds, silver tables populated |
 | EDA notebook (`fixtures/eda_churn_exploration`) | **Complete** — 30 cells, correlation matrix, VIF, distributions, box plots |
 | Feature engineering design (`docs/design/feature-engineering-design.md`) | **Complete** — 6 Feature Views + 3 static features specified |
-| Training notebooks (`src/train/`) | Stub |
+| Feature definitions (`src/train/feature_definitions.py`) | **Complete** — 6 Feature Views registered to UC, 3 helper views (DATE→TIMESTAMP) |
+| Training notebooks (`src/train/train.py`) | Stub |
 | Validation notebooks (`src/validate/`) | Stub |
 | Promotion notebooks (`src/promote/`) | Stub |
 | Deployment notebooks (`src/deploy/`) | Stub |
@@ -189,6 +206,8 @@ Validated by EDA (see `docs/design/feature-engineering-design.md` for full stati
 * **Serverless `/tmp/`:** Local `/tmp/` is ephemeral per task — not shared between job tasks. Use UC volumes for inter-task data transfer.
 * **`dbutils.fs` on serverless:** Cannot access `file:/tmp/...` or `file:/local/...`. Use Python `os`/`shutil` for local filesystem operations.
 * **Volume root is immutable:** `shutil.rmtree("/Volumes/.../volume_name")` fails with `OSError: Operation not supported`. Clean subdirectories individually instead.
+* **Feature Views DATE columns:** `timeseries_column` must be TIMESTAMP, not DATE — the API internally calls `unix_micros()` which rejects DATE. Fix: create helper views that CAST(date_col AS TIMESTAMP). The `transformation_sql` parameter on `DeltaTableSource` has an internal backtick-quoting bug (PARSE_SYNTAX_ERROR); use views instead.
+* **Feature Views Count input:** `Count(input=col)` cannot reference the `timeseries_column` — the API renames it internally. Use any other non-null column (e.g. `amount` instead of `billing_date`).
 
 ---
 

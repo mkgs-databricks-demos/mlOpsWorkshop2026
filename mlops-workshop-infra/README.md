@@ -66,7 +66,9 @@ mlops-workshop-infra/
 │   └── batch_inference_job.yml # Standalone batch inference
 ├── src/
 │   ├── data/                   # Data pipeline notebooks
-│   ├── train/                  # Feature definitions + training
+│   ├── train/                  # Feature engineering + training
+│   │   ├── feature_definitions.py  # Declarative Feature Views (6 UC features)
+│   │   └── feature_tables_classic  # Classic Feature Store comparison (2 feature tables)
 │   ├── validate/               # Model validation
 │   ├── promote/                # Champion/Challenger promotion
 │   ├── deploy/                 # MLflow 3 deployment
