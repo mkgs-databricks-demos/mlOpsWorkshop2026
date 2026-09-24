@@ -127,7 +127,7 @@
 * **Host:** `https://fevm-hls-fde.cloud.databricks.com`
 * **Targets:** dev (default, `mode: development`) / prod (`mode: production`, `run_as: matthew.giglia@databricks.com`)
 * **All bundles** include `resources/*.yml` and `resources/*/*.yml`
-* **Catalog:** TBD — design defaults to `mlops_workshop`, needs to be wired into variables
+* **Catalog:** `mlops_workshop` (default), wired via `${var.catalog}` with per-target overrides
 
 ---
 
@@ -135,9 +135,19 @@
 
 **Design docs: COMPLETE.** All L100/L200/L300 specs and instructor guide written.
 
-**Bundle scaffolding: CREATED.** Three bundle directories exist with boilerplate `databricks.yml`, `.gitignore`, and template READMEs. No `resources/`, `src/`, or `tests/` directories yet.
+**`-infra` bundle resources: COMPLETE.** (branch: `mg-genie-infra-bundle-resources`)
+* `databricks.yml` wired with `catalog`, `user_schema`, `use_zerobus` variables + per-target overrides
+* 7 resource YAML files in `resources/`: schema+volume, experiment, registered model, 4 jobs
+* All 8 `-infra` resources defined per L300 spec (schema, volume, experiment, model, data_ingestion, churn_model_training, churn_deployment_job, churn_batch_inference)
+* Jobs use condition gates, runtime task value refs, `AT_LEAST_ONE_SUCCESS` convergence, `MODEL_VERSION_READY` trigger
 
-**Source code: NOT STARTED.** Resource YAML, notebooks, and tests still need to be authored per L300 specs.
+**`-infra` notebooks: NOT STARTED.** 13 notebooks in `src/` still need to be authored per L300 contracts.
+
+**`-ai` bundle: NOT STARTED.** Variables + `serving_endpoint.yml` per L300.
+
+**`-monitors` bundle: NOT STARTED.** Variables + 5 resource YAMLs (3 monitors, dashboard, retraining job) + `check_metrics.py` per L300.
+
+**Tests: NOT STARTED.** Unit tests scaffold needed in `tests/`.
 
 ---
 
