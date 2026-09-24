@@ -28,7 +28,7 @@
 
 ---
 
-## Resources (8 total)
+## Resources (9 total)
 
 | Resource | Type | Key | File |
 |----------|------|-----|------|
@@ -36,51 +36,75 @@
 | Landing volume | `volumes` | `landing_volume` | `resources/schema.yml` |
 | MLflow experiment | `experiments` | `churn_experiment` | `resources/experiment.yml` |
 | Registered model | `registered_models` | `churn_model` | `resources/registered_model.yml` |
-| Data ingestion job | `jobs` | `data_ingestion` | `resources/data_ingestion_job.yml` |
+| Data ingestion pipeline | `pipelines` | `data_ingestion_pipeline` | `resources/data_ingestion_pipeline.yml` |
+| Data prep job | `jobs` | `data_ingestion` | `resources/data_ingestion_job.yml` |
 | Training + promotion job | `jobs` | `churn_model_training` | `resources/training_job.yml` |
 | MLflow 3 deployment job | `jobs` | `churn_deployment_job` | `resources/deployment_job.yml` |
 | Batch inference job | `jobs` | `churn_batch_inference` | `resources/batch_inference_job.yml` |
 
 ---
 
-## Notebooks (13 total)
+## Pipeline Source Files
+
+| File | Purpose |
+|------|----------|
+| `src/pipeline/ingestion/bronze.py` | `bronze_autoload` (Auto Loader streaming table), `bronze_zerobus` (placeholder), `bronze_unified` (temp view) |
+| `src/pipeline/ingestion/silver.py` | 5 materialized views: `customer_profiles`, `product_usage_events`, `billing_history`, `support_interactions`, `churn_labels` |
+
+## Notebooks
+
+### Implemented
+
+| Notebook | Path | Job | Parameters | Task Values | Status |
+|----------|------|-----|-----------|-------------|--------|
+| generate_ndjson | `src/data/generate_ndjson.py` | data_ingestion | catalog, schema, volume_path | ndjson_path, record_count | **Complete** |
+| post_to_zerobus | `src/data/post_to_zerobus.py` | data_ingestion | catalog, schema | — | Placeholder |
+| write_to_volume | `src/data/write_to_volume.py` | (standalone only) | volume_path | — | **Complete** (not in job) |
+
+### Stubs (implementation pending)
 
 | Notebook | Path | Job | Parameters | Task Values |
 |----------|------|-----|-----------|-------------|
-| create_bronze_tables | `src/data/create_bronze_tables.ipynb` | data_ingestion | catalog, schema | — |
-| generate_ndjson | `src/data/generate_ndjson.ipynb` | data_ingestion | catalog, schema | ndjson_path, record_count |
-| post_to_zerobus | `src/data/post_to_zerobus.ipynb` | data_ingestion | catalog, schema | — |
-| write_to_volume | `src/data/write_to_volume.ipynb` | data_ingestion | volume_path | — |
-| autoload_to_bronze | `src/data/autoload_to_bronze.ipynb` | data_ingestion | catalog, schema, volume_path | — |
-| flatten_to_silver | `src/data/flatten_to_silver.ipynb` | data_ingestion | catalog, schema | — |
-| feature_definitions | `src/train/feature_definitions.ipynb` | churn_model_training* | catalog, schema | — |
-| train | `src/train/train.ipynb` | churn_model_training | experiment_name, model_name, catalog, schema | model_version |
-| validate | `src/validate/validate.ipynb` | churn_model_training | model_name, model_version | validation_passed |
-| promote | `src/promote/promote.ipynb` | churn_model_training | model_name | promoted |
-| evaluate | `src/deploy/evaluate.ipynb` | churn_deployment_job | model_name | should_deploy |
-| promote_champion | `src/deploy/promote_champion.ipynb` | churn_deployment_job | model_name | — |
-| batch_predict | `src/inference/batch_predict.ipynb` | churn_batch_inference | model_name, catalog, schema | — |
+| feature_definitions | `src/train/feature_definitions.py` | churn_model_training* | catalog, schema | — |
+| train | `src/train/train.py` | churn_model_training | experiment_name, model_name, catalog, schema | model_version |
+| validate | `src/validate/validate.py` | churn_model_training | model_name, model_version | validation_passed |
+| promote | `src/promote/promote.py` | churn_model_training | model_name | promoted |
+| evaluate | `src/deploy/evaluate.py` | churn_deployment_job | model_name | should_deploy |
+| promote_champion | `src/deploy/promote_champion.py` | churn_deployment_job | model_name | — |
+| batch_predict | `src/inference/batch_predict.py` | churn_batch_inference | model_name, catalog, schema | — |
 
 \* `feature_definitions` task not yet in YAML — pending addition to `training_job.yml`
+
+### Obsolete (to delete)
+
+| File | Replaced By |
+|------|-------------|
+| `src/data/create_bronze_tables.py` | SDP pipeline (`bronze.py`) |
+| `src/data/autoload_to_bronze.py` | SDP pipeline (`bronze.py`) |
+| `src/data/flatten_to_silver.py` | SDP pipeline (`silver.py`) |
 
 ---
 
 ## Conventions
 
-* **Notebook paths:** `.ipynb` default (per workspace conventions)
+* **Notebook paths:** `.py` files on disk (Git folder convention — YAML must match actual extension)
 * **Schema refs:** `${resources.schemas.workshop_schema.*}` in all resource definitions — never raw `${var.schema}`
 * **Model name pattern:** `${catalog}.${schema}.churn_model` (3-level UC name)
 * **Task values:** All string — condition tasks compare string equality
 * **First cell:** `%pip install --upgrade databricks-sdk mlflow` + `dbutils.library.restartPython()` (not `%restart_python`)
 * **Idempotent DDL:** CREATE IF NOT EXISTS / CREATE OR REPLACE throughout
 * **VARIANT-first bronze:** `parse_json()` + VARIANT path notation, never `spark.read.json()` with schema inference
+* **SDP pipeline:** `from pyspark import pipelines as dp` — never `import dlt`
+* **Serverless I/O:** Use `os`/`shutil` for local filesystem; `dbutils.fs` only for cloud/UC paths. Never `dbutils.fs.rm("file:...")` or `dbutils.fs.ls("file:...")` on serverless.
 
 ---
 
 ## Key Technical Decisions
 
 * **All serverless compute** — no cluster definitions in job YAML, no ML Runtime
-* **Dual-path ingestion** — `use_zerobus` variable gates ZeroBus API vs Auto Loader; silver reads from `bronze_unified` (UNION ALL)
+* **SDP pipeline for ingestion** — streaming tables (bronze) + materialized views (silver); replaces 3 notebook tasks. Pipeline YAML uses `glob: include: ../src/pipeline/ingestion/**`.
+* **Direct-to-volume data generation** — `generate_ndjson` writes NDJSON partitioned by `record_type/` directly to the landing volume. Avoids `/tmp/` cross-task sharing on serverless.
+* **Dual-path ingestion** — `use_zerobus` variable gates ZeroBus API vs Auto Loader; `bronze_unified` (temporary view, UNION ALL) feeds silver. Downstream is path-agnostic.
 * **Champion/Challenger aliases** — Champion, Challenger, PreviousChampion. Promotion: F1 > 0.75, AUC within 0.005. First model auto-promotes.
 * **Feature Views (declarative)** — `databricks-feature-engineering>=0.16.0`. Eliminates training-serving skew via `fe.score_batch()`.
 * **Shared dev schema** — `mlops_workshop` in dev; per-participant override possible via `user_schema` variable
@@ -117,24 +141,38 @@
 
 | Component | Status |
 |-----------|--------|
-| `databricks.yml` | Complete (defaults: `hls_fde_dev` / `mlops_workshop`) |
-| Resource YAML (8 resources) | Complete (paths fixed, register_features task added, trigger commented) |
-| `src/` notebooks (13) | Scaffolded — valid .ipynb stubs, implementation pending |
+| `databricks.yml` | Complete |
+| Resource YAML (9 resources) | Complete (pipeline + 4 jobs + schema/volume/experiment/model) |
+| SDP pipeline (`src/pipeline/ingestion/`) | **Complete** — bronze + silver, verified with data |
+| Data generation (`generate_ndjson.py`) | **Complete** — 500 customers, ~22K total records |
+| Data prep job (end-to-end) | **Complete** — `bundle run` succeeds, silver tables populated |
+| Training notebooks (`src/train/`) | Stub |
+| Validation notebooks (`src/validate/`) | Stub |
+| Promotion notebooks (`src/promote/`) | Stub |
+| Deployment notebooks (`src/deploy/`) | Stub |
+| Inference notebooks (`src/inference/`) | Stub |
 | `tests/` | Not started |
 | Bundle validation | Passing (`--strict`, target dev) |
+| Bundle deployment | Deployed (source-linked, 9 resources) |
 
 ### Known Issues
 
 1. ~~`${bundle.user_name}`~~ — **RESOLVED.** Variable defaults updated; schema.yml comment fixed.
 2. ~~`model_update` trigger~~ — **RESOLVED.** Commented out with TODO note in deployment_job.yml.
 3. ~~Notebook path resolution~~ — **RESOLVED.** Changed `./src/` to `../src/` in all job YAML.
-4. ~~Notebooks not found~~ — **RESOLVED.** Created as `.ipynb` files (Git folder requires file-based notebooks, not native workspace notebooks).
+4. ~~Notebooks not found~~ — **RESOLVED.** Created as `.py` files (Git folder convention).
+5. ~~`.ipynb` vs `.py` mismatch~~ — **RESOLVED.** All 4 job YAMLs fixed to `.py` (14 refs).
+6. ~~Serverless `/tmp/` restrictions~~ — **RESOLVED.** Three fixes: `shutil` for local I/O, direct volume writes, subdirectory-only cleanup.
+7. **3 obsolete stubs remain on disk** — `create_bronze_tables.py`, `autoload_to_bronze.py`, `flatten_to_silver.py`. Not referenced; safe to delete.
 
 ---
 
 ## Gotchas
 
-* **Git folder notebook creation:** `createAsset` with `assetType: "notebook"` creates native workspace notebooks (type `NOTEBOOK`) that `bundle validate` cannot find. In Git folders, the CLI resolves `.ipynb` paths against the workspace file API which only sees `FILE` objects. Fix: use `createAsset` with `assetType: "file"` and name ending in `.ipynb`, then populate with valid Jupyter JSON. Do NOT create both — duplicates require manual cleanup.
+* **Git folder notebook creation:** `createAsset` with `assetType: "notebook"` creates native workspace notebooks (type `NOTEBOOK`) that `bundle validate` cannot find. In Git folders, the CLI resolves paths against the workspace file API which only sees `FILE` objects. Fix: use `createAsset` with `assetType: "file"` and name ending in `.py`, then populate with valid Python content.
+* **Serverless `/tmp/`:** Local `/tmp/` is ephemeral per task — not shared between job tasks. Use UC volumes for inter-task data transfer.
+* **`dbutils.fs` on serverless:** Cannot access `file:/tmp/...` or `file:/local/...`. Use Python `os`/`shutil` for local filesystem operations.
+* **Volume root is immutable:** `shutil.rmtree("/Volumes/.../volume_name")` fails with `OSError: Operation not supported`. Clean subdirectories individually instead.
 
 ---
 
