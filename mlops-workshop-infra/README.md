@@ -2,7 +2,7 @@
 
 **Bundle 1 of 3** — Infrastructure, data, training & promotion for the MLOps Workshop.
 
-Deploys foundational Unity Catalog resources and all ML lifecycle jobs: data ingestion (dual-path), model training with Feature Views, champion/challenger promotion, MLflow 3 deployment automation, and batch inference.
+Deploys foundational Unity Catalog resources and all ML lifecycle jobs: data ingestion (dual-path), model training with Classic Feature Store (LightGBM, nested cross-validation, feature importance pruning), champion/challenger promotion, MLflow 3 deployment automation, and batch inference.
 
 ## Resources Deployed
 
@@ -13,7 +13,7 @@ Deploys foundational Unity Catalog resources and all ML lifecycle jobs: data ing
 | MLflow Experiment | `churn_experiment` | Churn prediction experiment |
 | Registered Model | `churn_model` | UC-registered model with alias lifecycle |
 | Data Ingestion Job | `data_ingestion` | Dual-path: ZeroBus or Auto Loader → bronze → silver |
-| Training Job | `churn_model_training` | Train → validate → promote → batch inference |
+| Training Job | `churn_model_training` | Feature tables → validate → promote → batch inference |
 | Deployment Job | `churn_deployment_job` | MLflow 3 auto-trigger on MODEL_VERSION_READY |
 | Batch Inference Job | `churn_batch_inference` | Standalone @Champion scoring |
 
@@ -61,14 +61,15 @@ mlops-workshop-infra/
 │   ├── experiment.yml          # MLflow experiment
 │   ├── registered_model.yml    # UC registered model
 │   ├── data_ingestion_job.yml  # 7-task dual-path ingestion
-│   ├── training_job.yml        # 6-task training + promotion
+│   ├── training_job.yml        # 7-task training + promotion
 │   ├── deployment_job.yml      # 3-task MLflow 3 deployment
 │   └── batch_inference_job.yml # Standalone batch inference
 ├── src/
 │   ├── data/                   # Data pipeline notebooks
 │   ├── train/                  # Feature engineering + training
-│   │   ├── feature_definitions.py  # Declarative Feature Views (6 UC features)
-│   │   └── feature_tables_classic  # Classic Feature Store comparison (2 feature tables)
+│   │   ├── feature_definitions.py  # Declarative Feature Views (6 UC features, reference only)
+│   │   ├── feature_tables_classic.py  # Classic Feature Store (2 feature tables, active)
+│   │   └── train.py               # LightGBM training: nested CV, feature pruning, MLflow
 │   ├── validate/               # Model validation
 │   ├── promote/                # Champion/Challenger promotion
 │   ├── deploy/                 # MLflow 3 deployment

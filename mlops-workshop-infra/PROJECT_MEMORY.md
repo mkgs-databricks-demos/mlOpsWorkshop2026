@@ -60,21 +60,22 @@
 | generate_ndjson | `src/data/generate_ndjson.py` | data_ingestion | catalog, schema, volume_path | ndjson_path, record_count | **Complete** |
 | post_to_zerobus | `src/data/post_to_zerobus.py` | data_ingestion | catalog, schema | — | Placeholder |
 | write_to_volume | `src/data/write_to_volume.py` | (standalone only) | volume_path | — | **Complete** (not in job) |
-| feature_definitions | `src/train/feature_definitions.py` | churn_model_training* | catalog, schema | — | **Complete** — 6 Feature Views |
-| feature_tables_classic | `src/train/feature_tables_classic` | (standalone) | catalog, schema | — | **Complete** — classic comparison |
+| feature_definitions | `src/train/feature_definitions.py` | (reference only) | catalog, schema | — | **Complete** — 6 declarative Feature Views (not used in job) |
+| feature_tables_classic | `src/train/feature_tables_classic.py` | churn_model_training | catalog, schema | — | **Complete** — 6 windowed + 3 static features |
+| train | `src/train/train.py` | churn_model_training | experiment_name, model_name, catalog, schema | model_version | **Complete** — LightGBM, nested CV, feature pruning (v2) |
 
 ### Stubs (implementation pending)
 
 | Notebook | Path | Job | Parameters | Task Values |
 |----------|------|-----|-----------|-------------|
-| train | `src/train/train.py` | churn_model_training | experiment_name, model_name, catalog, schema | model_version |
 | validate | `src/validate/validate.py` | churn_model_training | model_name, model_version | validation_passed |
 | promote | `src/promote/promote.py` | churn_model_training | model_name | promoted |
 | evaluate | `src/deploy/evaluate.py` | churn_deployment_job | model_name | should_deploy |
 | promote_champion | `src/deploy/promote_champion.py` | churn_deployment_job | model_name | — |
 | batch_predict | `src/inference/batch_predict.py` | churn_batch_inference | model_name, catalog, schema | — |
 
-\* `feature_definitions` task not yet in YAML — pending addition to `training_job.yml`
+\* **Decision:** Classic Feature Store (`FeatureLookup` + `fe.create_training_set`) chosen over declarative Feature Views. `register_features` task in `training_job.yml` now runs `feature_tables_classic.py`. `feature_definitions.py` retained as reference.
+\* **Decision:** Training uses nested cross-validation (5 outer × 30 inner Optuna trials) + feature importance pruning. Model logged via `fe.log_model()` with pruned `FeatureLookup`s (5 of 9 features). Registration uses `MlflowClient.create_model_version()` to bypass metastore QUOTA_EXCEEDED on `register_model()`.
 
 ### UC Feature Objects
 
@@ -122,7 +123,9 @@ Helper views (DATE→TIMESTAMP cast): `product_usage_events_fv`, `billing_histor
 * **Direct-to-volume data generation** — `generate_ndjson` writes NDJSON partitioned by `record_type/` directly to the landing volume. Avoids `/tmp/` cross-task sharing on serverless.
 * **Dual-path ingestion** — `use_zerobus` variable gates ZeroBus API vs Auto Loader; `bronze_unified` (temporary view, UNION ALL) feeds silver. Downstream is path-agnostic.
 * **Champion/Challenger aliases** — Champion, Challenger, PreviousChampion. Promotion: F1 > 0.75, AUC within 0.005. First model auto-promotes.
-* **Feature Views (declarative)** — `databricks-feature-engineering>=0.16.0`. Eliminates training-serving skew via `fe.score_batch()`.
+* **Classic Feature Store** — `FeatureLookup` + `fe.create_training_set()` + `fe.log_model()`. Two feature tables (`churn_windowed_features` with point-in-time, `churn_profile_features` static). Eliminates training-serving skew via `fe.score_batch()`. Declarative Feature Views retained in `feature_definitions.py` as reference only.
+* **LightGBM with nested CV** — Nested cross-validation prevents tuning-induced overfitting. Tighter search space (max_depth 3–5, reg_alpha ≥ 0.1, reg_lambda ≥ 0.5, min_child_samples 25–50). Feature importance pruning reduces 9 → 5 features. Pruned `FeatureLookup`s logged with `fe.log_model()` so `fe.score_batch()` fetches only the 5 features the model uses.
+* **Model registration workaround** — Metastore at 5000 registered model quota. `mlflow.register_model()` internally tries create-or-get, hitting quota before detecting existing model. Fix: `MlflowClient.create_model_version()` adds a version directly to the bundle-deployed model.
 * **Shared dev schema** — `mlops_workshop` in dev; per-participant override possible via `user_schema` variable
 * **Two promotion paths** — training job has a fast-path promote, deployment job has a governed event-driven promote on MODEL_VERSION_READY
 
@@ -165,6 +168,40 @@ Validated by EDA (see `docs/design/feature-engineering-design.md` for full stati
 
 `region` (no signal), `avg_feature_depth` (no signal), `max_sessions`/`max_api_calls` (collinear), `avg_invoice` (collinear with plan+revenue), `invoice_count` (r=1.0 with tenure), `overdue_count`/`pending_count` (use rate instead), `escalated_count`/`pending_tickets` (use rate+count instead)
 
+### Feature Importance Pruning (model-justified)
+
+After nested CV, aggregated LightGBM feature importances across 5 outer folds:
+
+| Feature | Importance | Status |
+|---------|-----------|--------|
+| `tenure_days` | 33.0% | **Kept** |
+| `total_revenue_90d` | 30.2% | **Kept** |
+| `avg_daily_sessions_30d` | 12.5% | **Kept** |
+| `overdue_payment_count_90d` | 9.5% | **Kept** |
+| `company_size_encoded` | 9.0% | **Kept** |
+| `max_api_calls_7d` | 3.3% | Dropped (< 5%) |
+| `plan_type_encoded` | 1.4% | Dropped (< 5%) |
+| `support_tickets_7d` | 1.1% | Dropped (< 5%) |
+| `escalated_tickets_30d` | 0.0% | Dropped (< 5%) |
+
+Threshold: 5% relative importance. Top 3 features carry 76% of total importance.
+
+### Training Results (v2 — pruned model)
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Nested CV F1 | 0.6531 ± 0.055 | Unbiased (5 outer folds, no tuning leakage) |
+| Pruned CV F1 | 0.6853 | 5-fold CV on 5 features after re-tuning |
+| Test F1 | 0.3830 | 100-row holdout (19 churned) — high variance |
+| Test AUC | 0.7070 | Threshold-independent |
+| Test precision | 0.3214 | |
+| Test recall | 0.4737 | |
+| Features | 5 of 9 | After importance pruning |
+| Model | LightGBM | `class_weight="balanced"` for 18.8% imbalance |
+| Registered | v2 | `dev_matthew_giglia_churn_model` |
+
+**Observation:** CV-to-test F1 gap (0.27) reflects fundamental small-data challenge (400 train / 100 test, 94 total positives). Nested CV eliminated tuning leakage but cannot overcome sample size. Consider logistic regression baseline as a lower-variance alternative.
+
 ---
 
 ## Implementation Status
@@ -178,8 +215,9 @@ Validated by EDA (see `docs/design/feature-engineering-design.md` for full stati
 | Data prep job (end-to-end) | **Complete** — `bundle run` succeeds, silver tables populated |
 | EDA notebook (`fixtures/eda_churn_exploration`) | **Complete** — 30 cells, correlation matrix, VIF, distributions, box plots |
 | Feature engineering design (`docs/design/feature-engineering-design.md`) | **Complete** — 6 Feature Views + 3 static features specified |
-| Feature definitions (`src/train/feature_definitions.py`) | **Complete** — 6 Feature Views registered to UC, 3 helper views (DATE→TIMESTAMP) |
-| Training notebooks (`src/train/train.py`) | Stub |
+| Feature definitions (`src/train/feature_definitions.py`) | **Complete** — 6 Feature Views registered to UC (reference only, not used in job) |
+| Feature tables classic (`src/train/feature_tables_classic.py`) | **Complete** — 2 feature tables (windowed + profile), `register_features` task in training job |
+| Training notebooks (`src/train/train.py`) | **Complete** — LightGBM, nested CV (F1 0.65 ± 0.05), feature pruning 9→5, model v2 registered |
 | Validation notebooks (`src/validate/`) | Stub |
 | Promotion notebooks (`src/promote/`) | Stub |
 | Deployment notebooks (`src/deploy/`) | Stub |

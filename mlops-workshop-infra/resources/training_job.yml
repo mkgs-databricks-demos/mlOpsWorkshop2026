@@ -15,7 +15,7 @@ resources:
         # 0. Register Feature Views (idempotent)
         - task_key: register_features
           notebook_task:
-            notebook_path: ../src/train/feature_definitions.py
+            notebook_path: ../src/train/feature_tables_classic.py
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
