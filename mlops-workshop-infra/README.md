@@ -71,8 +71,11 @@ mlops-workshop-infra/
 │   ├── promote/                # Champion/Challenger promotion
 │   ├── deploy/                 # MLflow 3 deployment
 │   └── inference/              # Batch prediction
+├── fixtures/
+│   ├── eda_churn_exploration   # 30-cell EDA notebook (correlation, VIF, distributions)
+│   └── sessions/               # Session summaries
 ├── docs/
-│   └── design/                 # Implementation plan
+│   └── design/                 # Implementation plan + feature engineering design
 ├── PROJECT_MEMORY.md
 └── README.md
 ```
@@ -93,6 +96,7 @@ mlops-workshop-infra → mlops-workshop-ai → mlops-workshop-monitors
 
 ## Documentation
 
+* [Feature Engineering Design](docs/design/feature-engineering-design.md) — EDA findings, collinearity analysis, feature specifications
 * [Implementation Plan](docs/design/implementation-plan.md) — phased build plan with notebook contracts
 * [L200 Design](../../docs/design/L200-01-infra-bundle.md) — component-level design
 * [L300 Specs](../../docs/design/L300-implementation-specs.md) — complete implementation specifications

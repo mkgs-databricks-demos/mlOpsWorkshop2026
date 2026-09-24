@@ -23,7 +23,7 @@
 | Variable | Default | Dev Override | Prod Override |
 |----------|---------|-------------|---------------|
 | `catalog` | `hls_fde_dev` | `hls_fde_dev` | `mlops_workshop` |
-| `user_schema` | `mlops_workshop` | `mlops_workshop` | `mlops_prod` |
+| `user_schema` | `mlops_workshop` | `dev_matthew_giglia_mlops_workshop` (dev mode prefixes schema name) | `mlops_prod` |
 | `use_zerobus` | `"false"` | *(default)* | `"true"` |
 
 ---
@@ -126,14 +126,28 @@
 
 ## Feature Views
 
-| Feature | Source | Aggregation | Window |
-|---------|--------|-------------|--------|
-| `avg_daily_sessions_30d` | `product_usage_events` | Avg(session_count) | Tumbling 30d |
-| `support_tickets_7d` | `support_interactions` | Count(ticket_id) | Sliding 7d/1d |
-| `total_revenue_90d` | `billing_history` | Sum(amount) | Tumbling 90d |
-| `max_api_calls_7d` | `product_usage_events` | Max(api_calls) | Sliding 7d/1d |
-| `overdue_payment_count` | `billing_history` | Count(*) where overdue | Tumbling 90d |
-| `escalated_tickets_30d` | `support_interactions` | Count(*) where escalated | Tumbling 30d |
+Validated by EDA (see `docs/design/feature-engineering-design.md` for full statistical justification).
+
+| Feature | Source | Aggregation | Window | EDA Signal |
+|---------|--------|-------------|--------|------------|
+| `avg_daily_sessions_30d` | `product_usage_events` | Avg(session_count) | Tumbling 30d | 3.3x active/churned ratio |
+| `support_tickets_7d` | `support_interactions` | Count(ticket_id) | Sliding 7d/1d | 2.4x ratio, |r|=0.665 |
+| `total_revenue_90d` | `billing_history` | Sum(amount) | Tumbling 90d | 4.9x revenue gap |
+| `max_api_calls_7d` | `product_usage_events` | Max(api_calls) | Sliding 7d/1d | |r|=0.766 |
+| `overdue_payment_count_90d` | `billing_history` | Count(*) where overdue | Tumbling 90d | 3.8x overdue rate |
+| `escalated_tickets_30d` | `support_interactions` | Count(*) where escalated | Tumbling 30d | 9.0x count ratio |
+
+### Static Features
+
+| Feature | Source | Encoding | EDA Signal |
+|---------|--------|----------|------------|
+| `plan_type` | `customer_profiles` | Ordinal (free=0..enterprise=3) | 37% → 2.5% churn, monotonic |
+| `company_size` | `customer_profiles` | Ordinal (1-10=0..1000+=4) | Moderate signal |
+| `tenure_days` | `customer_profiles` | datediff(current_date, signup_date) | Weak control variable |
+
+### Excluded Features (EDA-justified)
+
+`region` (no signal), `avg_feature_depth` (no signal), `max_sessions`/`max_api_calls` (collinear), `avg_invoice` (collinear with plan+revenue), `invoice_count` (r=1.0 with tenure), `overdue_count`/`pending_count` (use rate instead), `escalated_count`/`pending_tickets` (use rate+count instead)
 
 ---
 
@@ -146,6 +160,8 @@
 | SDP pipeline (`src/pipeline/ingestion/`) | **Complete** — bronze + silver, verified with data |
 | Data generation (`generate_ndjson.py`) | **Complete** — 500 customers, ~22K total records |
 | Data prep job (end-to-end) | **Complete** — `bundle run` succeeds, silver tables populated |
+| EDA notebook (`fixtures/eda_churn_exploration`) | **Complete** — 30 cells, correlation matrix, VIF, distributions, box plots |
+| Feature engineering design (`docs/design/feature-engineering-design.md`) | **Complete** — 6 Feature Views + 3 static features specified |
 | Training notebooks (`src/train/`) | Stub |
 | Validation notebooks (`src/validate/`) | Stub |
 | Promotion notebooks (`src/promote/`) | Stub |
