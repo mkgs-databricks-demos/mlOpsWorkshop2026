@@ -65,20 +65,20 @@
 
 | Notebook | Parameters | Outputs |
 |----------|-----------|--------|
-| `create_bronze_tables.py` | catalog, schema | — |
-| `generate_ndjson.py` | catalog, schema | ndjson_path, record_count |
-| `post_to_zerobus.py` | catalog, schema | — |
-| `write_to_volume.py` | volume_path | — |
-| `autoload_to_bronze.py` | catalog, schema, volume_path | — |
-| `flatten_to_silver.py` | catalog, schema | — |
-| `feature_definitions.py` | catalog, schema | — |
-| `train.py` | experiment_name, model_name, catalog, schema | model_version |
-| `validate.py` | model_name, model_version | validation_passed |
-| `promote.py` | model_name | promoted |
-| `evaluate.py` | model_name | should_deploy |
-| `promote_champion.py` | model_name | — |
-| `batch_predict.py` | model_name, catalog, schema | — |
-| `check_metrics.py` | catalog, schema, max_psi, min_accuracy, max_consecutive_drift_days | retrain_needed |
+| `src/data/create_bronze_tables.ipynb` | catalog, schema | — |
+| `src/data/generate_ndjson.ipynb` | catalog, schema | ndjson_path, record_count |
+| `src/data/post_to_zerobus.ipynb` | catalog, schema | — |
+| `src/data/write_to_volume.ipynb` | volume_path | — |
+| `src/data/autoload_to_bronze.ipynb` | catalog, schema, volume_path | — |
+| `src/data/flatten_to_silver.ipynb` | catalog, schema | — |
+| `src/features/feature_definitions.ipynb` | catalog, schema | — |
+| `src/train/train.ipynb` | experiment_name, model_name, catalog, schema | model_version |
+| `src/validate/validate.ipynb` | model_name, model_version | validation_passed |
+| `src/promote/promote.ipynb` | model_name | promoted |
+| `src/deploy/evaluate.ipynb` | model_name | should_deploy |
+| `src/deploy/promote_champion.ipynb` | model_name | — |
+| `src/inference/batch_predict.ipynb` | model_name, catalog, schema | — |
+| `src/check_metrics.ipynb` (`-monitors`) | catalog, schema, max_psi, min_accuracy, max_consecutive_drift_days | retrain_needed |
 
 ---
 
@@ -141,13 +141,26 @@
 * All 8 `-infra` resources defined per L300 spec (schema, volume, experiment, model, data_ingestion, churn_model_training, churn_deployment_job, churn_batch_inference)
 * Jobs use condition gates, runtime task value refs, `AT_LEAST_ONE_SUCCESS` convergence, `MODEL_VERSION_READY` trigger
 
-**`-infra` notebooks: NOT STARTED.** 13 notebooks in `src/` still need to be authored per L300 contracts.
+**`-ai` bundle resources: COMPLETE.** (branch: `mg-genie-infra-bundle-resources`)
+* `databricks.yml` wired with `catalog`, `user_schema`, `registered_model_name` variables
+* `resources/serving_endpoint.yml`: `churn_serving` endpoint, scale-to-zero, AI Gateway inference table logging
+* Cross-bundle `registered_model_name` pattern documented
 
-**`-ai` bundle: NOT STARTED.** Variables + `serving_endpoint.yml` per L300.
+**`-monitors` bundle resources: COMPLETE.** (branch: `mg-genie-infra-bundle-resources`)
+* `databricks.yml` wired with `catalog`, `user_schema`, `warehouse_id`, `training_job_id` variables
+* `resources/predictions_monitor.yml`: `inference_log` profile on `churn_predictions`, daily 10 AM UTC
+* `resources/features_monitor.yml`: `time_series` profile on Feature View table, daily 9 AM UTC
+* `resources/serving_monitor.yml`: `time_series` profile on `churn_serving_payload`, every 30 min
+* `resources/mlops_dashboard.yml`: `serialized_dashboard` with 4 pages + 4 dataset queries from L300 spec
+* `resources/retraining_trigger_job.yml`: 3-task job (check_metrics → condition → `run_job_task`), daily 3 PM UTC
 
-**`-monitors` bundle: NOT STARTED.** Variables + 5 resource YAMLs (3 monitors, dashboard, retraining job) + `check_metrics.py` per L300.
+**Notebooks: NOT STARTED.** 14 notebooks in `src/` across all bundles still need to be authored per L300 contracts.
+* `-infra`: 13 notebooks across `src/data/`, `src/features/`, `src/train/`, `src/validate/`, `src/promote/`, `src/deploy/`, `src/inference/`
+* `-monitors`: 1 notebook (`src/check_metrics.ipynb`)
 
-**Tests: NOT STARTED.** Unit tests scaffold needed in `tests/`.
+**Dashboard widget layout: NOT STARTED.** `mlops_dashboard.yml` has datasets + page definitions. Full widget layout to be authored in UI and exported.
+
+**Tests: NOT STARTED.** Unit tests scaffold needed in `tests/` directories.
 
 ---
 
