@@ -1,0 +1,28 @@
+# Model Serving Endpoint + AI Gateway inference table logging
+#
+# Requires: -infra deployed with >=1 model version in UC registered model
+# Cross-bundle ref: ${var.registered_model_name} must match -infra output
+#
+# Feature lookup at serving time:
+#   Caller sends only {"customer_id": "CUST-00042"}
+#   Feature Store auto-resolves all features from online store
+#
+# After first request, Databricks auto-creates:
+#   ${var.catalog}.${var.user_schema}.churn_serving_payload
+#   (monitored by serving_monitor in -monitors bundle)
+resources:
+  model_serving_endpoints:
+    churn_serving:
+      name: "churn-serving-${var.user_schema}"
+      config:
+        served_entities:
+          - entity_name: ${var.registered_model_name}
+            entity_version: "1"
+            workload_size: "Small"
+            scale_to_zero_enabled: true
+      ai_gateway:
+        inference_table_config:
+          catalog_name: ${var.catalog}
+          schema_name: ${var.user_schema}
+          table_name_prefix: "churn_serving"
+          enabled: true

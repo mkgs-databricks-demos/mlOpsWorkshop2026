@@ -1,27 +1,40 @@
-# Declarative Automation Bundle configuration, more info here: https://docs.databricks.com/en/dev-tools/bundles/settings.html
+# Declarative Automation Bundle configuration
+# Bundle 2 of 3: Model Serving Endpoint + AI Gateway
 bundle:
-  name: "mlops-workshop-ai"
+  name: mlops-workshop-ai
+
+variables:
+  catalog:
+    description: "Must match -infra catalog"
+    default: "mlops_workshop"
+  user_schema:
+    description: "Must match -infra schema"
+  registered_model_name:
+    description: "Full 3-level name of registered model from -infra"
 
 include:
   - resources/*.yml
   - resources/*/*.yml
 
 targets:
-  # The 'dev' target, for development purposes. This target is the default.
   dev:
     mode: development
     default: true
     workspace:
       host: https://fevm-hls-fde.cloud.databricks.com
+    variables:
+      catalog: mlops_workshop
+      user_schema: "user_${bundle.user_name}"
+      registered_model_name: "mlops_workshop.user_${bundle.user_name}.churn_model"
 
-  # The 'prod' target, used for production deployment.
   prod:
     mode: production
     workspace:
       host: https://fevm-hls-fde.cloud.databricks.com
-      # We always use /Users/matthew.giglia@databricks.com for all resources to make sure we only have a single copy.
       root_path: /Users/matthew.giglia@databricks.com/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: mlops_workshop
+      user_schema: mlops_prod
+      registered_model_name: "mlops_workshop.mlops_prod.churn_model"
     run_as:
-      # This runs as matthew.giglia@databricks.com in production. We could also use a service principal here,
-      # see https://docs.databricks.com/dev-tools/bundles/permissions.html.
       user_name: matthew.giglia@databricks.com
