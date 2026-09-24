@@ -15,7 +15,7 @@ resources:
         # 0. Register Feature Views (idempotent)
         - task_key: register_features
           notebook_task:
-            notebook_path: ../src/train/feature_definitions.ipynb
+            notebook_path: ../src/train/feature_definitions.py
             base_parameters:
               catalog: ${var.catalog}
               schema: ${resources.schemas.workshop_schema.name}
@@ -25,7 +25,7 @@ resources:
           depends_on:
             - task_key: register_features
           notebook_task:
-            notebook_path: ../src/train/train.ipynb
+            notebook_path: ../src/train/train.py
             base_parameters:
               experiment_name: ${resources.experiments.churn_experiment.name}
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
@@ -37,7 +37,7 @@ resources:
           depends_on:
             - task_key: model_training
           notebook_task:
-            notebook_path: ../src/validate/validate.ipynb
+            notebook_path: ../src/validate/validate.py
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
               model_version: "{{tasks.model_training.values.model_version}}"
@@ -57,7 +57,7 @@ resources:
             - task_key: validation_gate
               outcome: "true"
           notebook_task:
-            notebook_path: ../src/promote/promote.ipynb
+            notebook_path: ../src/promote/promote.py
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
 
@@ -76,7 +76,7 @@ resources:
             - task_key: promotion_gate
               outcome: "true"
           notebook_task:
-            notebook_path: ../src/inference/batch_predict.ipynb
+            notebook_path: ../src/inference/batch_predict.py
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
               catalog: ${var.catalog}

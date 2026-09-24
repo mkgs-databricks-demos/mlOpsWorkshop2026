@@ -59,6 +59,23 @@ resources:
       schema_name: ${{resources.schemas.workshop_schema.name}}
       name: churn_model
       comment: "Customer churn prediction model"
+
+  pipelines:
+    data_ingestion_pipeline:
+      name: "[${bundle.target}] mlops-workshop-data-ingestion"
+      catalog: ${{resources.schemas.workshop_schema.catalog_name}}
+      target: ${{resources.schemas.workshop_schema.name}}
+      channel: CURRENT
+      serverless: true
+      development: true
+      libraries:
+        - glob:
+            include: ../src/pipeline/ingestion/**
+      configuration:
+        volume_path: "/Volumes/${{resources.schemas.workshop_schema.catalog_name}}/${{resources.schemas.workshop_schema.name}}/${{resources.volumes.landing_volume.name}}"
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026
 ```
 
 ---
@@ -178,24 +195,53 @@ resources:
 
 ## 4. Data Schemas
 
-### 4.1 Bronze Tables
+### 4.1 Bronze Streaming Tables (SDP)
 
-```sql
--- Both tables share the same schema (ZeroBus contract)
-CREATE TABLE bronze_zerobus / bronze_autoload (
-  record_type STRING COMMENT 'Entity type discriminator',
-  payload STRING COMMENT 'JSON string — parsed via parse_json() in Silver',
-  ingested_at TIMESTAMP COMMENT 'Ingestion timestamp'
-)
+Bronze tables are declared as SDP streaming tables with data quality expectations. No manual DDL — the pipeline manages table lifecycle.
+
+```python
+# src/pipeline/ingestion/bronze_autoload.py
+from pyspark import pipelines as dp
+
+@dp.table(name="bronze_autoload", comment="Raw NDJSON via Auto Loader")
+@dp.expect("valid_record_type", "record_type IS NOT NULL")
+@dp.expect("valid_payload", "payload IS NOT NULL")
+def bronze_autoload():
+    volume_path = spark.conf.get("volume_path")
+    return (
+        spark.readStream.format("cloudFiles")
+            .option("cloudFiles.format", "json")
+            .option("cloudFiles.inferColumnTypes", "false")
+            .load(volume_path)
+            .selectExpr(
+                "record_type",
+                "CAST(payload AS STRING) AS payload",
+                "current_timestamp() AS ingested_at"
+            )
+    )
 ```
 
-### 4.2 Bronze Unified View
+Both bronze tables share the same output schema:
 
-```sql
-CREATE OR REPLACE VIEW bronze_unified AS
-SELECT record_type, payload, ingested_at, 'zerobus' AS source FROM bronze_zerobus
-UNION ALL
-SELECT record_type, payload, ingested_at, 'autoload' AS source FROM bronze_autoload
+| Column | Type | Comment |
+|--------|------|---------|
+| `record_type` | STRING | Entity type discriminator |
+| `payload` | STRING | JSON string — parsed via `parse_json()` in silver |
+| `ingested_at` | TIMESTAMP | Ingestion timestamp |
+
+### 4.2 Bronze Unified Temporary View (SDP)
+
+```python
+# src/pipeline/ingestion/bronze_unified.py
+@dp.temporary_view()
+def bronze_unified():
+    return spark.sql("""
+        SELECT record_type, payload, ingested_at, 'autoload' AS source
+        FROM STREAM(LIVE.bronze_autoload)
+        UNION ALL
+        SELECT record_type, payload, ingested_at, 'zerobus' AS source
+        FROM STREAM(LIVE.bronze_zerobus)
+    """)
 ```
 
 ### 4.3 Silver Tables
@@ -227,14 +273,15 @@ CREATE TABLE churn_predictions (
 
 ## 5. Notebook Interface Contracts
 
-| Notebook | Parameters | Task Value Outputs |
-|----------|-----------|-------------------|
-| `create_bronze_tables.py` | catalog, schema | — |
-| `generate_ndjson.py` | catalog, schema | ndjson_path, record_count |
-| `post_to_zerobus.py` | catalog, schema | — |
-| `write_to_volume.py` | volume_path | — |
-| `autoload_to_bronze.py` | catalog, schema, volume_path | — |
-| `flatten_to_silver.py` | catalog, schema | — |
+| Notebook | Context | Parameters / Config | Task Value Outputs |
+|----------|---------|--------------------|-----------|
+| `generate_ndjson.py` | Data prep job | catalog, schema | ndjson_path, record_count |
+| `post_to_zerobus.py` | Data prep job | catalog, schema | — |
+| `write_to_volume.py` | Data prep job | volume_path | — |
+| `pipeline/ingestion/bronze_autoload.py` | SDP pipeline | `volume_path` (pipeline config) | — |
+| `pipeline/ingestion/bronze_zerobus.py` | SDP pipeline | — | — |
+| `pipeline/ingestion/bronze_unified.py` | SDP pipeline | — | — |
+| `pipeline/ingestion/silver_tables.py` | SDP pipeline | — | — |
 | `feature_definitions.py` | catalog, schema | — |
 | `train.py` | experiment_name, model_name, catalog, schema | model_version |
 | `validate.py` | model_name, model_version | validation_passed |

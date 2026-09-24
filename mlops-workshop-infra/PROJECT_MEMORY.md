@@ -132,6 +132,12 @@
 
 ---
 
+## Gotchas
+
+* **Git folder notebook creation:** `createAsset` with `assetType: "notebook"` creates native workspace notebooks (type `NOTEBOOK`) that `bundle validate` cannot find. In Git folders, the CLI resolves `.ipynb` paths against the workspace file API which only sees `FILE` objects. Fix: use `createAsset` with `assetType: "file"` and name ending in `.ipynb`, then populate with valid Jupyter JSON. Do NOT create both — duplicates require manual cleanup.
+
+---
+
 ## Dependencies
 
 | Depends On | Provided By |

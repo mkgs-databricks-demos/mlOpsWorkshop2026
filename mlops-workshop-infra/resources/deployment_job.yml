@@ -21,7 +21,7 @@ resources:
         # 1. Evaluate the new model version
         - task_key: evaluate
           notebook_task:
-            notebook_path: ../src/deploy/evaluate.ipynb
+            notebook_path: ../src/deploy/evaluate.py
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"
 
@@ -40,6 +40,6 @@ resources:
             - task_key: approve
               outcome: "true"
           notebook_task:
-            notebook_path: ../src/deploy/promote_champion.ipynb
+            notebook_path: ../src/deploy/promote_champion.py
             base_parameters:
               model_name: "${resources.schemas.workshop_schema.catalog_name}.${resources.schemas.workshop_schema.name}.${resources.registered_models.churn_model.name}"

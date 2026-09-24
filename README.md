@@ -13,14 +13,15 @@ Three bundles deployed in sequence:
 ```
 mlops-workshop-infra  →  mlops-workshop-ai  →  mlops-workshop-monitors
        (deploy)               (deploy)               (deploy)
-   data ingestion          serving endpoint        quality monitors
-   model training          AI Gateway              MLOps dashboard
-   batch inference         inference table         retraining trigger
+   SDP pipeline            serving endpoint        quality monitors
+   data prep job           AI Gateway              MLOps dashboard
+   model training          inference table         retraining trigger
+   batch inference
 ```
 
 | Bundle | What It Deploys |
 |--------|-----------------|
-| **`-infra`** | UC schema, volume, experiment, registered model, data ingestion job, training + promotion job, MLflow 3 deployment job, batch inference job |
+| **`-infra`** | UC schema, volume, experiment, registered model, SDP ingestion pipeline, data prep job, training + promotion job, MLflow 3 deployment job, batch inference job |
 | **`-ai`** | Model Serving endpoint with AI Gateway inference table logging |
 | **`-monitors`** | 3 quality monitors, serialized MLOps dashboard, retraining trigger job |
 
@@ -28,7 +29,7 @@ mlops-workshop-infra  →  mlops-workshop-ai  →  mlops-workshop-monitors
 
 * **All serverless compute** — no ML Runtime required
 * **VARIANT-first bronze** — `parse_json()`, no schema inference
-* **Dual-path ingestion** — ZeroBus API or Auto Loader, gated by `use_zerobus` variable
+* **SDP ingestion pipeline** — streaming tables for bronze → silver; dual-path data landing (ZeroBus or Auto Loader) gated by `use_zerobus`
 * **Champion/Challenger aliases** — governed promotion with validation gates
 * **Feature Views** — declarative, eliminates training-serving skew
 * **Per-participant isolation** — `user_${bundle.user_name}` schemas
@@ -40,14 +41,15 @@ mlOpsWorkshop2026/
 ├── mlops-workshop-infra/           # Bundle 1: UC resources + jobs
 │   ├── databricks.yml              # Variables: catalog, user_schema, use_zerobus
 │   ├── resources/
-│   │   ├── schema.yml              # UC schema + landing volume
-│   │   ├── experiment.yml          # MLflow experiment
-│   │   ├── registered_model.yml    # UC registered model
-│   │   ├── data_ingestion_job.yml  # 7-task dual-path ingestion
-│   │   ├── training_job.yml        # 6-task training + promotion
-│   │   ├── deployment_job.yml      # MLflow 3 auto-trigger
-│   │   └── batch_inference_job.yml # Standalone @Champion scoring
-│   └── src/                        # (next) 13 notebooks
+│   │   ├── schema.yml                   # UC schema + landing volume
+│   │   ├── experiment.yml               # MLflow experiment
+│   │   ├── registered_model.yml         # UC registered model
+│   │   ├── data_ingestion_pipeline.yml  # SDP pipeline: bronze → silver
+│   │   ├── data_ingestion_job.yml       # Data prep + pipeline trigger
+│   │   ├── training_job.yml             # 6-task training + promotion
+│   │   ├── deployment_job.yml           # MLflow 3 auto-trigger
+│   │   └── batch_inference_job.yml      # Standalone @Champion scoring
+│   └── src/                             # Pipeline + job notebooks
 ├── mlops-workshop-ai/              # Bundle 2: serving endpoint
 │   ├── databricks.yml              # Variables: catalog, user_schema, registered_model_name
 │   └── resources/
@@ -81,7 +83,7 @@ done
 cd mlops-workshop-infra
 databricks bundle deploy --target dev
 
-# 2. Run data ingestion + training
+# 2. Run data prep (generates data + triggers SDP pipeline)
 databricks bundle run --target dev data_ingestion
 databricks bundle run --target dev churn_model_training
 

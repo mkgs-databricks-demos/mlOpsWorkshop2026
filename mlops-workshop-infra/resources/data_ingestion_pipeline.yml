@@ -1,0 +1,28 @@
+# Ingestion Pipeline — SDP: Auto Loader → bronze → silver
+# Multi-file editor source in src/pipeline/ingestion/
+resources:
+  pipelines:
+    data_ingestion_pipeline:
+      name: "[${bundle.target}] mlops-workshop-data-ingestion-pipeline"
+
+      catalog: ${resources.schemas.workshop_schema.catalog_name}
+      target: ${resources.schemas.workshop_schema.name}
+
+      libraries:
+        - glob:
+            include: ../src/pipeline/ingestion/**
+
+      root_path: ../src/pipeline/ingestion
+
+      serverless: true
+      continuous: false
+      development: true
+      photon: true
+      channel: current
+
+      configuration:
+        volume_path: "/Volumes/${resources.schemas.workshop_schema.catalog_name}/${resources.schemas.workshop_schema.name}/${resources.volumes.landing_volume.name}"
+
+      tags:
+        bundle: mlops-workshop-infra
+        workshop: mlops-workshop-2026

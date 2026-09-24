@@ -20,7 +20,7 @@ Deliver a **one-day, hands-on MLOps workshop** that teaches customers the modern
 
 | Bundle | Name | Deploys | Depends On |
 |--------|------|---------|------------|
-| **1** | `mlops-workshop-infra` | UC schema, volume, experiment, registered model, data ingestion job, training + promotion job, MLflow 3 deployment job, batch inference job | Customer catalog with USE CATALOG + CREATE SCHEMA |
+| **1** | `mlops-workshop-infra` | UC schema, volume, experiment, registered model, SDP ingestion pipeline, data prep job, training + promotion job, MLflow 3 deployment job, batch inference job | Customer catalog with USE CATALOG + CREATE SCHEMA |
 | **2** | `mlops-workshop-ai` | Model Serving endpoint with AI Gateway inference table logging | `-infra` deployed + ≥1 model version exists |
 | **3** | `mlops-workshop-monitors` | 3 quality monitors, serialized MLOps dashboard, retraining trigger job | `-infra` batch inference has run (tables have data) |
 
@@ -28,7 +28,7 @@ Deliver a **one-day, hands-on MLOps workshop** that teaches customers the modern
 
 ```
 -infra (deploy)
-    → data_ingestion (run)
+    → data_ingestion (run)  ← lands data + triggers SDP pipeline
     → churn_model_training (run)
 -ai (deploy)
     → send test requests
@@ -62,14 +62,16 @@ These patterns apply to ALL bundles and ALL code. L200 components reference this
 - All tables, features, models, and volumes live within the participant's schema
 - **Production recommendation:** separate catalogs per environment (dev/staging/prod)
 
-### 3.3 Dual-Path Ingestion
+### 3.3 Dual-Path Ingestion (SDP Pipeline)
 
-| Path | Gate | Landing Table | When Used |
-|------|------|---------------|-----------|
+Data ingestion uses a **Spark Declarative Pipeline** (SDP) for bronze → silver processing. A separate data prep job generates synthetic data and lands it; the job's final task triggers the pipeline.
+
+| Path | Gate | SDP Streaming Table | When Used |
+|------|------|---------------------|-----------|
 | **ZeroBus API** | `use_zerobus=true` | `bronze_zerobus` | Production / ZeroBus-enabled workspaces |
 | **Auto Loader** | `use_zerobus=false` (default) | `bronze_autoload` | Workshop default / file-based ingestion |
 
-Silver reads from `bronze_unified` (UNION ALL of both) — downstream is path-agnostic.
+The pipeline declares both bronze streaming tables — whichever path has data flows through. `bronze_unified` (temporary view, UNION ALL) feeds five silver streaming tables with `parse_json()` extraction and data quality expectations. Downstream is path-agnostic.
 
 ### 3.4 VARIANT-First Data Pattern
 
@@ -122,7 +124,8 @@ Silver reads from `bronze_unified` (UNION ALL of both) — downstream is path-ag
 | Landing volume | `-infra` | `volumes` | `landing_volume` |
 | MLflow experiment | `-infra` | `experiments` | `churn_experiment` |
 | Registered model | `-infra` | `registered_models` | `churn_model` |
-| Data ingestion job | `-infra` | `jobs` | `data_ingestion` |
+| Data ingestion pipeline | `-infra` | `pipelines` | `data_ingestion_pipeline` |
+| Data prep job | `-infra` | `jobs` | `data_ingestion` |
 | Training + promotion job | `-infra` | `jobs` | `churn_model_training` |
 | MLflow 3 deployment job | `-infra` | `jobs` | `churn_deployment_job` |
 | Batch inference job | `-infra` | `jobs` | `churn_batch_inference` |
@@ -164,7 +167,7 @@ All notebooks receive parameters via `base_parameters`. Notebooks read via `dbut
 | Deployment automation | MLflow 3 deployment jobs | Auto-triggers on new model version |
 | Monitoring | Quality monitors (bundle resource) | Declarative, version-controlled |
 | Dashboard | Serialized inline | Deploys without query validation, parameterized |
-| Ingestion | ZeroBus + Auto Loader (dual-path) | `use_zerobus` gates the path; silver is path-agnostic |
+| Ingestion | SDP pipeline (ZeroBus + Auto Loader dual-path) | Streaming tables for bronze + silver; `use_zerobus` gates data landing; pipeline processes both |
 | Bronze pattern | VARIANT via parse_json() | Schema-as-contract, no schema inference |
 
 ---
@@ -179,18 +182,22 @@ mlops-workshop/
 │   │   ├── schema.yml
 │   │   ├── experiment.yml
 │   │   ├── registered_model.yml
-│   │   ├── data_ingestion_job.yml
+│   │   ├── data_ingestion_pipeline.yml  # SDP pipeline resource
+│   │   ├── data_ingestion_job.yml       # Data prep + pipeline trigger
 │   │   ├── training_job.yml
 │   │   ├── deployment_job.yml
 │   │   └── batch_inference_job.yml
 │   ├── src/
+│   │   ├── pipeline/
+│   │   │   └── ingestion/               # SDP pipeline notebooks
+│   │   │       ├── bronze_autoload.py
+│   │   │       ├── bronze_zerobus.py
+│   │   │       ├── bronze_unified.py
+│   │   │       └── silver_tables.py
 │   │   ├── data/
-│   │   │   ├── create_bronze_tables.py
 │   │   │   ├── generate_ndjson.py
 │   │   │   ├── post_to_zerobus.py
-│   │   │   ├── write_to_volume.py
-│   │   │   ├── autoload_to_bronze.py
-│   │   │   └── flatten_to_silver.py
+│   │   │   └── write_to_volume.py
 │   │   ├── features/
 │   │   │   └── feature_definitions.py
 │   │   ├── train/
@@ -252,7 +259,7 @@ mlops-workshop/
 | Model training (scikit-learn/XGBoost) | Serverless | Standard pip packages, no GPU needed |
 | MLflow tracking + registration | Serverless | Built into the platform |
 | Batch inference | Serverless | `fe.score_batch()` runs on Spark |
-| Data ingestion (Auto Loader) | Serverless | Structured Streaming on serverless |
+| Data ingestion (SDP pipeline) | Serverless | SDP serverless with Photon; Auto Loader + streaming tables |
 | ZeroBus SDK | Serverless | Pure Python SDK, no cluster dependency |
 
 ## 9. Prerequisites

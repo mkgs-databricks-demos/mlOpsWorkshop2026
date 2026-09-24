@@ -2,14 +2,14 @@
 
 **Classification:** Level 200 — Per-Component Detailed Design
 **Bundle:** `mlops-workshop-infra`
-**Scope:** UC schema, volume, experiment, registered model, data ingestion (dual-path), training, validation, champion/challenger promotion, batch inference, MLflow 3 deployment job
+**Scope:** UC schema, volume, experiment, registered model, SDP ingestion pipeline, data prep job (dual-path), training, validation, champion/challenger promotion, batch inference, MLflow 3 deployment job
 **Cross-cutting patterns:** See L100 §3
 
 ---
 
 ## 1. Overview
 
-The `-infra` bundle is the foundation of the workshop. It deploys first and creates every UC resource that downstream bundles depend on. It also contains all jobs: data ingestion, model training + promotion, MLflow 3 deployment automation, and batch inference.
+The `-infra` bundle is the foundation of the workshop. It deploys first and creates every UC resource that downstream bundles depend on. It contains the SDP ingestion pipeline (bronze → silver), a data prep job that lands synthetic data and triggers the pipeline, plus the model training + promotion, MLflow 3 deployment automation, and batch inference jobs.
 
 **Deployment command:**
 ```bash
@@ -69,7 +69,26 @@ resources:
           value: "Churn prediction experiment — MLOps Workshop"
 ```
 
-### 3.4 Registered Model
+### 3.4 Ingestion Pipeline (SDP)
+
+```yaml
+resources:
+  pipelines:
+    data_ingestion_pipeline:
+      name: "[${bundle.target}] mlops-workshop-data-ingestion"
+      catalog: ${resources.schemas.workshop_schema.catalog_name}
+      target: ${resources.schemas.workshop_schema.name}
+      channel: CURRENT
+      serverless: true
+      development: true
+      libraries:
+        - glob:
+            include: ../src/pipeline/ingestion/**
+      configuration:
+        volume_path: "/Volumes/${resources.schemas.workshop_schema.catalog_name}/${resources.schemas.workshop_schema.name}/${resources.volumes.landing_volume.name}"
+```
+
+### 3.5 Registered Model
 
 ```yaml
 resources:
@@ -81,7 +100,7 @@ resources:
       comment: "Customer churn prediction model — MLOps Workshop"
 ```
 
-### 3.5 Variables
+### 3.6 Variables
 
 ```yaml
 variables:
@@ -97,50 +116,115 @@ variables:
 
 ---
 
-## 4. Data Ingestion Job Design
+## 4. Data Ingestion Design
+
+Data ingestion is split into two resources:
+
+1. **SDP Pipeline** (`data_ingestion_pipeline`) — declares bronze streaming tables, a unified temporary view, and five silver streaming tables with data quality expectations.
+2. **Data Prep Job** (`data_ingestion`) — generates synthetic data, lands it via the appropriate path, then triggers the pipeline.
 
 ### 4.1 Dual-Path Architecture
 
-The `use_zerobus` variable (default `false`) controls which ingestion path is used. A condition task gates the routing. Silver reads from BOTH bronze tables via `bronze_unified` UNION ALL view regardless of which path was active.
+The `use_zerobus` variable (default `false`) controls where data **lands**. The SDP pipeline declares both bronze streaming tables and processes whichever has data. Silver reads from BOTH via a `bronze_unified` temporary view.
 
 > See docs/diagrams/02_data_ingestion_flow.md
 
-### 4.2 Task Graph
+### 4.2 Data Prep Job Task Graph
 
 ```
-create_bronze_tables
-    ↓
 generate_ndjson
     ↓
 check_zerobus_gate (condition: use_zerobus == "true")
-    ├── TRUE:  stream_via_zerobus → bronze_zerobus
-    └── FALSE: write_ndjson_to_volume → autoload_to_bronze → bronze_autoload
-                    ↓
-            flatten_bronze_to_silver (UNION ALL → parse_json() → 5 Silver tables)
+    ├── TRUE:  post_to_zerobus
+    └── FALSE: write_ndjson_to_volume
+    ↓
+run_ingestion_pipeline (converge, AT_LEAST_ONE_SUCCESS → pipeline_task)
 ```
 
-### 4.3 Bronze Table Schema (ZeroBus Contract)
+### 4.3 SDP Pipeline Structure
 
-```sql
-CREATE TABLE bronze_zerobus / bronze_autoload (
-  record_type STRING,    -- Entity type discriminator
-  payload STRING,        -- JSON string (parsed in Silver via parse_json())
-  ingested_at TIMESTAMP  -- Ingestion timestamp
+The pipeline is a multi-file SDP under `src/pipeline/ingestion/`:
+
+| File | SDP Object | Type | Purpose |
+|------|-----------|------|---------|
+| `bronze_autoload.py` | `bronze_autoload` | Streaming table | Auto Loader from landing volume |
+| `bronze_zerobus.py` | `bronze_zerobus` | Streaming table | Reads from ZeroBus-populated raw table |
+| `bronze_unified.py` | `bronze_unified` | Temporary view | UNION ALL of both bronze tables |
+| `silver_tables.py` | 5 streaming tables | Streaming tables | `parse_json()` extraction per entity type |
+
+### 4.4 Bronze Streaming Tables
+
+```python
+from pyspark import pipelines as dp
+
+@dp.table(
+    name="bronze_autoload",
+    comment="Raw NDJSON ingested via Auto Loader from landing volume"
 )
+@dp.expect("valid_record_type", "record_type IS NOT NULL")
+@dp.expect("valid_payload", "payload IS NOT NULL")
+def bronze_autoload():
+    volume_path = spark.conf.get("volume_path")
+    return (
+        spark.readStream.format("cloudFiles")
+            .option("cloudFiles.format", "json")
+            .option("cloudFiles.inferColumnTypes", "false")
+            .load(volume_path)
+            .selectExpr(
+                "record_type",
+                "CAST(payload AS STRING) AS payload",
+                "current_timestamp() AS ingested_at"
+            )
+    )
 ```
 
-### 4.4 Silver Extraction Pattern
+### 4.5 Bronze Unified Temporary View
 
-```sql
--- All silver tables follow this pattern:
-SELECT
-  parse_json(payload):field_name::TARGET_TYPE AS column_name,
-  ...
-FROM bronze_unified
-WHERE record_type = 'entity_type'
+```python
+@dp.temporary_view()
+def bronze_unified():
+    return spark.sql("""
+        SELECT record_type, payload, ingested_at, 'autoload' AS source
+        FROM STREAM(LIVE.bronze_autoload)
+        UNION ALL
+        SELECT record_type, payload, ingested_at, 'zerobus' AS source
+        FROM STREAM(LIVE.bronze_zerobus)
+    """)
 ```
 
-### 4.5 Silver Tables Produced
+### 4.6 Silver Streaming Tables
+
+```python
+@dp.table(
+    name="customer_profiles",
+    comment="Customer profile dimension"
+)
+@dp.expect_or_drop("valid_customer_id", "customer_id IS NOT NULL")
+def customer_profiles():
+    return spark.sql("""
+        SELECT
+            parse_json(payload):customer_id::STRING AS customer_id,
+            parse_json(payload):signup_date::DATE AS signup_date,
+            parse_json(payload):plan_type::STRING AS plan_type,
+            parse_json(payload):region::STRING AS region,
+            parse_json(payload):company_size::STRING AS company_size,
+            source,
+            ingested_at
+        FROM STREAM(LIVE.bronze_unified)
+        WHERE record_type = 'customer_profile'
+    """)
+```
+
+### 4.7 Data Quality Expectations
+
+| Layer | Expectation | Action | Applied To |
+|-------|------------|--------|------------|
+| Bronze | `valid_record_type` | Warn (track) | Both bronze tables |
+| Bronze | `valid_payload` | Warn (track) | Both bronze tables |
+| Silver | `valid_customer_id` | Drop | All silver tables |
+| Silver | `valid_date` | Drop | Tables with date keys |
+
+### 4.8 Silver Tables Produced
 
 | Table | Key | Grain | Source record_type |
 |-------|-----|-------|--------------------|
@@ -240,7 +324,7 @@ predictions.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.churn_predi
 |-----|--------|
 | Deploy time | < 2 minutes for `bundle deploy`
 | Compute | Serverless (latest environment, no ML Runtime) | |
-| Data ingestion | 500 customers × ~60 records each ≈ 30K records in < 5 minutes |
+| Data prep + pipeline | 500 customers × ~60 records each ≈ 30K records; data landing < 2 min, pipeline refresh < 3 min |
 | Training time | < 10 minutes on 2-worker cluster |
 | Promotion | Atomic alias swap (< 1 second) |
 | Participant isolation | Per-schema — no cross-participant data leakage |
@@ -253,7 +337,8 @@ predictions.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.churn_predi
 |------|------|-----|
 | Bundle validation | YAML correctness | `databricks bundle validate -t dev` |
 | Schema creation | Schema exists after deploy | Query `information_schema.schemata` |
-| Data ingestion | Silver tables populated | `SELECT COUNT(*) FROM customer_profiles` |
+| Pipeline refresh | Silver tables populated | `SELECT COUNT(*) FROM customer_profiles` |
+| Pipeline expectations | No dropped rows at bronze | Pipeline event log: expectation metrics |
 | Model registration | Model version exists | `client.get_latest_versions()` |
 | Alias assignment | Champion alias set | `client.get_model_version_by_alias("Champion")` |
 
@@ -263,7 +348,7 @@ predictions.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.churn_predi
 
 - [ ] Should the workshop support protobuf ZeroBus ingestion in addition to JSON?
 - [ ] Should the deployment job include a human-in-the-loop approval task for the workshop, or auto-approve?
-- [ ] Should we add a `pipeline` resource for SDP-based silver flattening as an advanced module?
+- [x] ~~Should we add a `pipeline` resource for SDP-based silver flattening as an advanced module?~~ → **Yes — adopted as the primary ingestion pattern.** Data ingestion now uses an SDP pipeline for bronze → silver processing.
 
 ---
 
